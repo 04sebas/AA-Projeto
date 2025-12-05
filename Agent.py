@@ -2,7 +2,7 @@ import random
 
 from numpy import argmax
 
-from AmbienteFarol import Goal, Wall
+from AmbienteFarol import Goal, Wall, Ground
 import numpy as np
 
 class AgenteLearner :
@@ -12,7 +12,7 @@ class AgenteLearner :
         self.actions = [(-1,0), (1,0), (0,-1), (0,1)] 
         
         self.foundGoal = False
-        self.num_steps = 5000
+        self.num_steps = 1000
         self.x = farol.agentx
         self.y = farol.agenty
         self.farol = farol
@@ -46,10 +46,42 @@ class AgenteLearner :
         #for action in self.genotype:
         
         for _ in range(self.num_steps):
-            
-            
-            inputs = np.array([self.x / self.farol.size, self.y / self.farol.size,
-                   self.farol.goalx / self.farol.size, self.farol.goaly / self.farol.size])
+
+            observation = self.farol.observation(self.x, self.y, depth=3)
+            obs = []
+
+            action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # up, down, right, left
+
+            for i in range(4):  # for each direction
+                dx, dy = action_map[i]
+                for step in range(1, 4):  # 1 → 3 steps
+                    obj = observation[i][step - 1]
+
+                    if isinstance(obj, Goal):
+                        obs.append(0.9)
+
+                    elif isinstance(obj, Wall):
+                        obs.append(-0.9)
+
+                    elif isinstance(obj, Ground):
+                        newx = self.x + dx * step
+                        newy = self.y + dy * step
+                        newDist = self.distance_to_goal2(newx, newy)
+
+                        if self.distance_to_goal2(self.x, self.y) > newDist:
+                            obs.append(0.5)  # moving closer
+                        else:
+                            obs.append(-0.1)  # moving further
+
+                    else:
+                        obs.append(-0.9)  # None or outside
+
+            inputs = np.array([
+                self.x / self.farol.size,
+                self.y / self.farol.size,
+                *obs,
+                self.distance_to_goal2(self.x, self.y)
+            ])
 
             output_vector = self.neural_network.forward(inputs)
 
@@ -80,7 +112,7 @@ class AgenteLearner :
             self.foundGoal = True
             self.y = newy
             self.x = newx
-            return 1000, True
+            return 1500, True
 
         elif isinstance(obj, Wall):
 
@@ -89,11 +121,14 @@ class AgenteLearner :
             prev_dist = self.distance_to_goal()
             self.y = newy
             self.x = newx
+
+
             new_dist = self.distance_to_goal()
-            reward = -0.1
+            reward = 0.1
             if new_dist < prev_dist:
-                reward += 0.2
+                reward += 2.0
             return reward, False
+
 
         
     def mutate(self, mutation_rate):
@@ -112,4 +147,8 @@ class AgenteLearner :
     def distance_to_goal(self):
         #return math.sqrt((self.x - self.farol.goalx)**2 + (self.y - self.farol.goaly)**2)
         return abs(self.x - self.farol.goalx) + abs(self.y - self.farol.goaly)
+
+    def distance_to_goal2(self, x, y):
+        #return math.sqrt((self.x - self.farol.goalx)**2 + (self.y - self.farol.goaly)**2)
+        return (abs(x - self.farol.goalx) + abs(y - self.farol.goaly))/ self.farol.size
 

@@ -149,9 +149,29 @@ class Farol:
         self.size = 100
         self.agentx, self.agenty = self.random_valid_position()
 
+    def observation(self, x, y, depth=3):
+        obs = {0: [], 1: [], 2: [], 3: []}  # up, down, left, right
 
+        # direction vectors (dx, dy)
+        directions = {
+            0: (0, 1),  # up
+            1: (0, -1),  # down
+            2: (-1, 0),  # left
+            3: (1, 0),  # right
+        }
 
+        for direction, (dx, dy) in directions.items():
+            for step in range(1, depth + 1):
+                nx = x + dx * step
+                ny = y + dy * step
 
+                if 0 <= nx < self.size and 0 <= ny < self.size:
+                    obj = self.get_object_here(nx, ny)
+                    obs[direction].append(obj)
+                else:
+                    obs[direction].append(None)
+
+        return obs
 
 
 if __name__ == "__main__":
