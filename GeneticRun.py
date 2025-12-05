@@ -3,7 +3,6 @@ from matplotlib import patches
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-import AmbienteFarol
 from AmbienteFarol import Wall, Farol
 from Agent import AgenteLearner
 import NeuralNetwork
@@ -19,8 +18,8 @@ class GeneticSimulation:
         child1_geno = np.concatenate([parent1.neural_network.weights[:point], parent2.neural_network.weights[point:]])
         child2_geno = np.concatenate([parent2.neural_network.weights[:point], parent1.neural_network.weights[point:]])
 
-        nn1 = NeuralNetwork.create_network_architecture(4, 4, (16,8 ))
-        nn2 = NeuralNetwork.create_network_architecture(4, 4, (16,8 ))
+        nn1 = NeuralNetwork.create_network_architecture(15, 4, (16,8 ))
+        nn2 = NeuralNetwork.create_network_architecture(15, 4, (16,8 ))
 
         nn1.load_weights(child1_geno)
         nn2.load_weights(child2_geno)
@@ -44,10 +43,11 @@ class GeneticSimulation:
 
         # --- Initialization ---
         population = []
+        last_generation = []
         farol = Farol("Farol.txt")
 
         for _ in range(POPULATION_SIZE):
-            nn = NeuralNetwork.create_network_architecture(4, 4, (16, 8))
+            nn = NeuralNetwork.create_network_architecture(15, 4, (16, 8))
             num_weights = nn.compute_num_weights()
             weights = [random.uniform(-1, 1) for _ in range(num_weights)]
             nn.load_weights(weights)
@@ -66,10 +66,10 @@ class GeneticSimulation:
             total_fitness = 0
 
             # 1. Evaluate Population
+
             for agent in population:
                 start_x, start_y = farol.random_valid_position()
                 agent.run_simulation(start_x=start_x, start_y=start_y)
-
                 total_fitness += agent.getFitness()
 
             # 2. Sort population by *fitness*
@@ -102,7 +102,7 @@ class GeneticSimulation:
             n_elite = POPULATION_SIZE // 5
 
             for elite_agent in population[:n_elite]:
-                nn_copy = NeuralNetwork.create_network_architecture(4, 4, (16,8))
+                nn_copy = NeuralNetwork.create_network_architecture(15, 4, (16,8))
                 nn_copy.load_weights(elite_agent.neural_network.weights.copy())
                 new_agent = AgenteLearner(farol, nn_copy)  # Use MAIN farol
                 new_population.append(new_agent)
@@ -120,6 +120,7 @@ class GeneticSimulation:
                 if len(new_population) < POPULATION_SIZE:
                     new_population.append(child2)
 
+            last_generation = population.copy()
             population = new_population
 
         np.savetxt("best_weights.txt", population[0].neural_network.weights)
@@ -171,4 +172,58 @@ class GeneticSimulation:
             plt.ylabel("Average Combined Fitness Score")
             plt.grid(True)
 
+
+            ##### PLOT ALL AGENTS PATHS FROM LAST GENERATION #####
+            print("Plotting all agents from last generation...")
+
+            fig2, ax2 = plt.subplots(figsize=(10, 10))
+
+            # Plot walls
+            for wall in farol.walls:
+                ax2.add_patch(
+                    patches.Rectangle(
+                        (wall.x - 0.5, wall.y - 0.5),
+                        1, 1,
+                        facecolor='black'
+                    )
+                )
+
+            # Goal
+            ax2.text(
+                farol.goalx, farol.goaly, "G",
+                color='green', fontsize=10,
+                ha='center', va='center', fontweight='bold'
+            )
+
+            # --- Use get_cmap() ---
+            cmap = plt.get_cmap("viridis")  # You can choose ANY cmap here
+            colors = cmap(np.linspace(0, 1, len(population)))
+
+            # Plot each agent path
+            for i, agent in enumerate(last_generation):
+                if hasattr(agent, "path") and len(agent.path) > 1:
+                    x_vals = [p[0] for p in agent.path]
+                    y_vals = [p[1] for p in agent.path]
+
+                    ax2.plot(
+                        x_vals, y_vals,
+                        color=colors[i],
+                        alpha=0.5,
+                        linewidth=1
+                    )
+
+                    # Mark final position
+                    ax2.plot(
+                        x_vals[-1], y_vals[-1],
+                        marker='x',
+                        color=colors[i],
+                        markersize=6
+                    )
+
+            ax2.set_xlim(-1, 100)
+            ax2.set_ylim(-1, 100)
+            ax2.set_title("All Agent Paths - Last Generation")
+            ax2.set_xlabel("X")
+            ax2.set_ylabel("Y")
+            ax2.grid(True)
             plt.show()
