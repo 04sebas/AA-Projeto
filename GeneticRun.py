@@ -69,7 +69,7 @@ class GeneticSimulation:
 
             for agent in population:
                 start_x, start_y = farol.random_valid_position()
-                agent.run_simulation(start_x=start_x, start_y=start_y)
+                agent.run_genetic_simulation(start_x=start_x, start_y=start_y)
                 total_fitness += agent.getFitness()
 
             # 2. Sort population by *fitness*

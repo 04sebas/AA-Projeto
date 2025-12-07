@@ -1,16 +1,17 @@
 import random
 from collections import deque
-
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import cm, patches
 from numpy import argmax
-
+import Agent
 import AmbienteFarol
 import NeuralNetwork
 
 
-class DQN:
+class Dqn_nn:
     def __init__(self, inputSize, outputSize):
-        self.nn = NeuralNetwork.create_network_architecture(inputSize, outputSize, (16,8))
+        self.nn = NeuralNetwork.create_network_architecture(inputSize, outputSize, (16,16))
 
     def forward(self, input):
         return self.nn.forward(input)
@@ -18,139 +19,185 @@ class DQN:
     def compute_gradients(self, x, target):
         return self.nn.compute_gradients(x, target)
 
-amb = AmbienteFarol.Farol("Farol.txt")
+class DqnSimulation:
 
-# Hyperparameters
-learning_rate = 0.001
-gamma = 0.99
-epsilon = 1.0
-epsilon_min = 0.01
-epsilon_decay = 0.995
-batch_size = 16
-target_update_freq = 100
-memory_size = 10000
-episodes = 25
-action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+    def __init__(self):
 
-# Initialize Q-networks
-inputSize = 4
-outputSize = 4
+        self.optimization_steps = 0
+        self.amb = AmbienteFarol.Farol("Farol.txt")
 
-policy_nn = DQN(inputSize, outputSize)
+        # Hyperparameters
+        learning_rate = 0.002
+        self.gamma = 0.99
+        self.epsilon = 1.0
+        self.epsilon_min = 0.1
+        self.epsilon_decay = 0.985
+        self.batch_size = 32
+        self.target_update_freq = 50
+        memory_size = 50000
+        self.episodes = 500
+        self.action_map = [(0, 1), (0, -1), (-1, 0), (1, 0)]
 
-weights = policy_nn.nn.weights
+        # Initialize Q-networks
+        inputSize = 15
+        outputSize = 4
 
-target_nn = DQN(inputSize, outputSize)
-target_nn.nn.load_weights(policy_nn.nn.weights.copy())
+        self.policy_nn = Dqn_nn(inputSize, outputSize)
 
-optimizer = NeuralNetwork.Adam(policy_nn.nn.weights, lr = learning_rate)
-memory = deque(maxlen=memory_size)
+        self.weights = self.policy_nn.nn.weights
 
+        self.target_nn = Dqn_nn(inputSize, outputSize)
+        self.target_nn.nn.load_weights(self.policy_nn.nn.weights.copy())
 
-def select_action(state, epsilon):
-    if random.random() < epsilon:
-        action_index = random.randint(0, 3)  # integer index
-    else:
-        q_values = policy_nn.forward(state)
-        action_index = argmax(q_values)
+        self.optimizer = NeuralNetwork.Adam(self.policy_nn.nn.weights, lr=learning_rate)
+        self.memory = deque(maxlen=memory_size)
 
-    move = action_map[action_index]  # convert index to move for amb
-    return move, action_index
+    def select_action(self, state, epsilon):
+        if random.random() < epsilon:
+            action_index = random.randint(0, 3)  # integer index
+        else:
+            q_values = self.policy_nn.forward(state)
+            action_index = argmax(q_values)
 
+        return action_index
 
-# Function to optimize the model using experience replay
-def optimize_model():
-    if len(memory) < batch_size:
-        return
+    # Function to optimize the model using experience replay
+    def optimize_model(self):
+        if len(self.memory) < self.batch_size:
+            return
 
-    batch = random.sample(memory, batch_size)
+        batch = random.sample(self.memory, self.batch_size)
+        states, actions, rewards, next_states, dones = zip(*batch)
 
-    states, actions, rewards, next_states, dones = zip(*batch)
+        states = np.array(states)
+        next_states = np.array(next_states)
+        rewards = np.array(rewards)
+        dones = np.array(dones, dtype=np.float32)
+        actions = np.array(actions)
 
-    states = np.array(states)
-    next_states = np.array(next_states)
-    rewards = np.array(rewards)
-    dones = np.array(dones)
-    actions = np.array(actions)  # actions should be indices 0..output_size-1
+        # Get current Q-values
+        current_q = np.zeros(self.batch_size)
+        for i in range(self.batch_size):
+            q_vals = self.policy_nn.forward(states[i])
+            current_q[i] = q_vals[actions[i]]
 
-    # Compute current Q-values for the actions taken
-    q_values = np.array([policy_nn.forward(s) for s in states])  # shape: [batch_size, output_size]
-    q_values_taken = q_values[np.arange(batch_size), actions]  # Q(s, a) for each action taken
+        # Get target Q-values
+        target_q = np.zeros(self.batch_size)
+        for i in range(self.batch_size):
+            if dones[i]:
+                target_q[i] = rewards[i]
+            else:
+                next_q_vals = self.target_nn.forward(next_states[i])
+                target_q[i] = rewards[i] + self.gamma * np.max(next_q_vals)
 
-    # Compute target Q-values using target network
-    next_q_values = np.array([target_nn.forward(s) for s in next_states])
-    max_next_q_values = np.max(next_q_values, axis=1)
-    target_q_values = rewards + gamma * max_next_q_values * (1 - dones)
+        # Compute gradients
+        grads = np.zeros_like(self.policy_nn.nn.weights)
 
-    # Compute the gradient of the loss w.r.t weights
-    grads = np.zeros_like(policy_nn.nn.weights)
+        for i in range(self.batch_size):
+            state = states[i]
+            action = actions[i]
 
-    for i in range(batch_size):
-        target = q_values[i].copy()
-        target[actions[i]] = target_q_values[i]  # Only update the taken action
-        grad_i = policy_nn.compute_gradients(states[i], target)
-        grads += grad_i / batch_size  # average gradient
+            # Forward pass to get current Q-values
+            q_values = self.policy_nn.forward(state)
 
-    # Update weights using Adam optimizer
-    optimizer.step(grads)
-    policy_nn.nn.load_weights(optimizer.params)
+            # Create target vector
+            target = q_values.copy()
+            target[action] = target_q[i]
 
-rewards_per_episode = []
-steps_done = 0
+            # Compute gradient for this sample
+            grad_i = self.policy_nn.compute_gradients(state, target)
+            grads += grad_i
 
-for episode in range(episodes):
-    amb.reset()
-    state = np.array([amb.agentx / amb.size,                # Posição do agente normalizada
-                      amb.agenty / amb.size,
-                      (amb.goalx - amb.agentx) / amb.size,   # Posição do agente em relação ao goal normalizada
-                      (amb.goaly - amb.agenty) / amb.size])
-    print(state)
-    episode_reward = 0
-    done = False
-    print(f"Episode {episode + 1} start")
-    max_steps = 2500
-    steps = 0
-    while not done and steps < max_steps:
-        # Select action
-        move, action_index = select_action(state, epsilon)
-        _ , reward, done = amb.step(action_index)
-        next_state = np.array([
-                    amb.agentx / amb.size,
-                    amb.agenty / amb.size,
-                    (amb.goalx - amb.agentx) / amb.size,
-                    (amb.goaly - amb.agenty) / amb.size])
-        # Store transition in memory
-        memory.append((state, action_index, reward, next_state, done))
+        # Average gradients
+        grads = grads / self.batch_size
 
-        # Update state
-        state = next_state
-        episode_reward += reward
-
-        # Optimize model
-        optimize_model()
+        # Update weights
+        self.optimizer.step(grads)
+        self.policy_nn.nn.load_weights(self.optimizer.params)
 
         # Update target network periodically
-        if steps_done > 0 and steps_done % target_update_freq == 0:
-            target_nn.nn.load_weights(policy_nn.nn.weights)
+        self.optimization_steps += 1
+        if self.optimization_steps % self.target_update_freq == 0:
+            self.target_nn.nn.load_weights(self.policy_nn.nn.weights.copy())
 
-        steps_done += 1
-        steps += 1
-        if done:
-            print(f"Goal reached in {steps} steps!")
-            break
-    # Decay epsilon
-    epsilon = max(epsilon_min, epsilon_decay * epsilon)
-    rewards_per_episode.append(episode_reward)
+    def getState(self, agent):
+
+        base_state = [
+            agent.x / agent.farol.size,
+            agent.y / agent.farol.size,
+            agent.distance_to_goal(agent.x, agent.y)
+        ]
+        surroundings = agent.surroundings()
+        return np.array([*base_state, *surroundings])
+
+    def dqnRun(self):
+        self.optimization_steps = 0
+        rewards_per_episode = []
+        pathsPerEpisode = []
+        for episode in range(self.episodes):
+
+            print(f"Episode {episode + 1} start")
+
+            agent = Agent.AgenteLearner(self.amb, None)
+
+            self.amb.reset()
+
+            #Agent sim
+            episode_reward, path = agent.run_DQN_simulation(None, None, self)
+
+            # Decay epsilon
+            self.epsilon = max(self.epsilon_min, self.epsilon_decay * self.epsilon)
 
 
-    print(f"Episode {episode + 1} reward: {episode_reward}")
-    print(f"Distance to goal {amb.distance_to_goal()}\n")
+            rewards_per_episode.append(episode_reward)
+            pathsPerEpisode.append(path)
 
-# Plotting the rewards per episode
-import matplotlib.pyplot as plt
+            # Add periodic logging
+            if episode % 5 == 0:
+                print(f"Epsilon: {self.epsilon:.3f}, Memory: {len(self.memory)}")
 
-plt.plot(rewards_per_episode)
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('DQN')
-plt.show()
+            print(f"Episode {episode + 1} reward: {episode_reward}")
+            print(f"Distance to goal {agent.distance_to_goal_agent()}\n")
+
+        # Plotting the rewards per episode
+        plt.plot(rewards_per_episode)
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.title('DQN')
+
+        ##### PATH PLOT #####
+        fig, ax = plt.subplots(figsize=(10, 10))
+        colors = cm.rainbow(np.linspace(0, 1, len(pathsPerEpisode)))
+
+        # Plot walls and goal
+        for wall in self.amb.walls:
+            ax.add_patch(
+                patches.Rectangle(
+                    (wall.x - 0.5, wall.y - 0.5),  # lower-left corner
+                    1, 1,  # width, height
+                    facecolor='black'
+                )
+            )
+
+        ax.text(self.amb.goalx, self.amb.goaly, "G", color='green', fontsize=9, ha='center', va='center',
+                fontweight='bold')
+        # Plot paths
+        plot_gens = [0,50,100,150,200,250,300,350,400,450,499]
+        for i in plot_gens:
+            path = pathsPerEpisode[i]
+            avg_fitness = rewards_per_episode[i]  # Get the avg combined fitness
+            x_vals = [p[0] for p in path]
+            y_vals = [p[1] for p in path]
+            ax.plot(x_vals, y_vals, color=colors[i], label=f"Gen {i + 1} (Avg Fitness: {avg_fitness:.2f})",
+                    alpha=0.7)
+            ax.plot(x_vals[-1], y_vals[-1], 'x', color=colors[i], markersize=10, markeredgewidth=2)
+
+        ax.set_xlim(-1, 100)
+        ax.set_ylim(-1, 100)
+        ax.set_title("Best Agent Paths Over Generations")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.legend()
+        plt.grid(True)
+
+        plt.show()
