@@ -94,37 +94,6 @@ class Farol:
 
         return random.choice(actions)
 
-    def step(self, action_index):
-
-        action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-        dx, dy = action_map[action_index]
-        newx = self.agentx + dx
-        newy = self.agenty + dy
-
-        if not (0 <= newx < self.size and 0 <= newy < self.size):
-            return (self.agentx, self.agenty), -5, False
-
-        obj = self.get_object_here(newx, newy)
-
-        if isinstance(obj, Goal):
-
-            self.agenty = newy
-            self.agentx = newx
-            return (self.agentx, self.agenty), 2500, True
-
-        elif isinstance(obj, Wall):
-
-            return (self.agentx, self.agenty), -5, False
-        else:
-
-            prev_dist = self.distance_to_goal()
-            self.agenty = newy
-            self.agentx = newx
-            new_dist = self.distance_to_goal()
-            reward = -0.05
-            if new_dist < prev_dist: reward += 1
-            return (self.agentx, self.agenty), reward, False
-
     def random_valid_position(self):
 
         attempts = 0
@@ -139,10 +108,6 @@ class Farol:
             attempts += 1
 
         return 0,0
-
-    def distance_to_goal(self):
-        #return math.sqrt((self.x - self.farol.goalx)**2 + (self.y - self.farol.goaly)**2)
-        return abs(self.agentx - self.goalx) + abs(self.agenty - self.goaly)
 
     def reset(self):
         self.grid, self.goalx, self.goaly, self.walls = self.load_grid_from_file("Farol.txt")

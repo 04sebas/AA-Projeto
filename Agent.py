@@ -9,7 +9,8 @@ class AgenteLearner :
     
     def __init__(self, farol, neural_network):
         
-        self.actions = [(-1,0), (1,0), (0,-1), (0,1)] 
+        self.weights = None
+        self.actions =  [(0, 1), (0, -1), (1, 0), (-1, 0)]
         
         self.foundGoal = False
         self.num_steps = 1000
@@ -20,12 +21,89 @@ class AgenteLearner :
         self.behavior = set()
         self.path = []
         self.fitness = 0.0
-    
-    def run_simulation(self, start_x=None, start_y=None):
-        
-        """Runs the agent's genotype in a fresh environment to get its behavior."""
-        
-        # --- Reset all state variables ---
+
+    def surroundings(self):
+        observation = self.farol.observation(self.x, self.y, depth=3)
+        obs = []
+
+        action_map = [(0, 1),(0, -1),(-1, 0),(1, 0)]  # up, down, right, left
+
+        for i in range(4):  # for each direction
+            dx, dy = action_map[i]
+            for step in range(1, 4):  # 1 → 3 steps
+                obj = observation[i][step - 1]
+
+                if isinstance(obj, Goal):
+                    obs.append(0.9)
+
+                elif isinstance(obj, Wall):
+                    obs.append(-0.9)
+
+                elif isinstance(obj, Ground):
+                    newx = self.x + dx * step
+                    newy = self.y + dy * step
+                    newDist = self.distance_to_goal(newx, newy)
+
+                    if self.distance_to_goal(self.x, self.y) > newDist:
+                        obs.append(0.5)  # moving closer
+                    else:
+                        obs.append(-0.1)  # moving further
+
+                else:
+                    obs.append(-0.9)  # None or outside
+
+        return obs
+
+    def mutate(self, mutation_rate):
+        self.weights = self.neural_network.weights
+        for i in range(len( self.weights)):
+            if random.random() < mutation_rate:
+                self.weights[i] += random.uniform(-0.1, 0.1)
+                
+        self.neural_network.load_weights(self.weights)
+
+    def getFitness(self):
+        return self.fitness
+
+    def distance_to_goal(self, x, y):
+        return (abs(x - self.farol.goalx) + abs(y - self.farol.goaly))/ self.farol.size
+
+    def distance_to_goal_agent(self):
+        return (abs(self.x - self.farol.goalx) + abs(self.y - self.farol.goaly)) / self.farol.size
+
+    def step(self, action_index):
+
+        action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        dx, dy = action_map[action_index]
+        newx, newy = self.x + dx, self.y + dy
+
+        if not (0 <= newx < self.farol.size and 0 <= newy < self.farol.size):
+            return -1, False
+
+        obj = self.farol.get_object_here(newx, newy)
+
+        if isinstance(obj, Goal):
+            self.foundGoal = True
+            self.y = newy
+            self.x = newx
+            return 1000, True
+
+        elif isinstance(obj, Wall):
+
+            return -1, False
+        else:
+            prev_dist = self.distance_to_goal(self.x, self.y)
+            self.y = newy
+            self.x = newx
+
+            new_dist = self.distance_to_goal(self.x, self.y)
+            reward = -0.05
+            if new_dist < prev_dist:
+                reward += 1.0
+            return reward, False
+
+
+    def run_genetic_simulation(self, start_x=None, start_y=None):
 
         self.foundGoal = False
         self.behavior = set()
@@ -37,50 +115,18 @@ class AgenteLearner :
         else:
             self.x, self.y = self.farol.agentx, self.farol.agenty
 
-        # Add starting position
         self.behavior.add((self.x, self.y))
         self.path.append((self.x, self.y))
 
-        # We need to track the keys *this agent* has for this run
-
-        #for action in self.genotype:
-        
         for _ in range(self.num_steps):
 
-            observation = self.farol.observation(self.x, self.y, depth=3)
-            obs = []
-
-            action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # up, down, right, left
-
-            for i in range(4):  # for each direction
-                dx, dy = action_map[i]
-                for step in range(1, 4):  # 1 → 3 steps
-                    obj = observation[i][step - 1]
-
-                    if isinstance(obj, Goal):
-                        obs.append(0.9)
-
-                    elif isinstance(obj, Wall):
-                        obs.append(-0.9)
-
-                    elif isinstance(obj, Ground):
-                        newx = self.x + dx * step
-                        newy = self.y + dy * step
-                        newDist = self.distance_to_goal2(newx, newy)
-
-                        if self.distance_to_goal2(self.x, self.y) > newDist:
-                            obs.append(0.5)  # moving closer
-                        else:
-                            obs.append(-0.1)  # moving further
-
-                    else:
-                        obs.append(-0.9)  # None or outside
+            obs = self.surroundings()
 
             inputs = np.array([
                 self.x / self.farol.size,
                 self.y / self.farol.size,
                 *obs,
-                self.distance_to_goal2(self.x, self.y)
+                self.distance_to_goal(self.x, self.y)
             ])
 
             output_vector = self.neural_network.forward(inputs)
@@ -96,59 +142,42 @@ class AgenteLearner :
             if found:
                 break
 
-    def step(self, action_index):
+    def run_DQN_simulation(self, start_x=None, start_y=None, dqnSim=None):
 
-        action_map = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-        dx, dy = action_map[action_index]
-        newx = self.x + dx
-        newy = self.y + dy
+        self.num_steps = 500
+        dqnSim.episode_reward = 0
+        dqnSim.done= False
+        stepsDone = 0
+        episodeReward = 0
+        self.path = []
 
-        if not (0 <= newx < self.farol.size and 0 <= newy < self.farol.size):
-            return -1, False
-
-        obj = self.farol.get_object_here(newx, newy)
-
-        if isinstance(obj, Goal):
-            self.foundGoal = True
-            self.y = newy
-            self.x = newx
-            return 1500, True
-
-        elif isinstance(obj, Wall):
-
-            return -1, False
+        if start_x is not None and start_y is not None:
+            self.x, self.y = start_x, start_y
         else:
-            prev_dist = self.distance_to_goal()
-            self.y = newy
-            self.x = newx
+            self.x, self.y = self.farol.agentx, self.farol.agenty
 
+        for _ in range(self.num_steps):
 
-            new_dist = self.distance_to_goal()
-            reward = 0.1
-            if new_dist < prev_dist:
-                reward += 2.0
-            return reward, False
+            state = dqnSim.getState(self)
+            action_index = dqnSim.select_action(state, dqnSim.epsilon)
 
+            reward, done = self.step(action_index)
+            self.path.append((self.x, self.y))
 
-        
-    def mutate(self, mutation_rate):
-        """Randomly changes some actions in the genotype."""
-        self.weights = self.neural_network.weights
-        for i in range(len( self.weights)):
-            if random.random() < mutation_rate:
-                self.weights[i] += random.uniform(-0.1, 0.1)
-                
-        self.neural_network.load_weights(self.weights)
+            episodeReward += reward
 
-    # --- NEW FITNESS FUNCTION ---
-    def getFitness(self):
-        return self.fitness
-        
-    def distance_to_goal(self):
-        #return math.sqrt((self.x - self.farol.goalx)**2 + (self.y - self.farol.goaly)**2)
-        return abs(self.x - self.farol.goalx) + abs(self.y - self.farol.goaly)
+            next_state = dqnSim.getState(self)
 
-    def distance_to_goal2(self, x, y):
-        #return math.sqrt((self.x - self.farol.goalx)**2 + (self.y - self.farol.goaly)**2)
-        return (abs(x - self.farol.goalx) + abs(y - self.farol.goaly))/ self.farol.size
+            # Store transition in memory
+            dqnSim.memory.append((state, action_index, reward, next_state, done))
 
+            # Optimize model
+            dqnSim.optimize_model()
+
+            stepsDone += 1
+
+            if done:
+                print(f"Goal reached in {stepsDone} steps!")
+                return episodeReward, self.path
+
+        return episodeReward, self.path
