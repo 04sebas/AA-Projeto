@@ -1,0 +1,60 @@
+{
+  "simulador": {
+    "max_passos": 1000
+  },
+
+  "ambiente": {
+    "tipo": "AmbienteFarol",
+    "largura": 100,
+    "altura": 100,
+    "pos_farol": [50, 75],
+    "obstaculos": [
+      {"pos": [45, 70]}, {"pos": [46, 70]}, {"pos": [47, 70]}, {"pos": [48, 70]}, {"pos": [49, 70]}, {"pos": [50, 70]}, {"pos": [51, 70]}, {"pos": [52, 70]}, {"pos": [53, 70]}, {"pos": [54, 70]},
+      {"pos": [45, 78]}, {"pos": [54, 78]},
+      {"pos": [45, 79]}, {"pos": [46, 79]}, {"pos": [47, 79]}, {"pos": [48, 79]}, {"pos": [49, 79]}, {"pos": [50, 79]}, {"pos": [51, 79]}, {"pos": [52, 79]}, {"pos": [53, 79]}, {"pos": [54, 79]}
+    ]
+  },
+  "agentes": [
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 2,
+      "posicao_inicial": "random",
+      "politica": {
+        "tipo": "greedy",
+        "alcance": 10
+      }
+    },
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 0,
+      "posicao_inicial": "random",
+      "politica": {
+        "tipo": "random",
+        "alcance": 5
+      }
+    },
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 0,
+      "posicao_inicial": "random",
+      "tipo_estrategia": "genetica",
+      "sensores": 1
+    }
+  ],
+
+  "estrategia": [
+    {
+      "tipo": "qlearning",
+      "alfa": 0.1,
+      "gamma": 0.5,
+      "epsilon": 0.2
+    },
+    {
+      "tipo": "genetica",
+      "pop_size": 50,
+      "num_gen": 25,
+      "mut_rate": 0.01,
+      "torn_size": 3
+    }
+  ]
+}
