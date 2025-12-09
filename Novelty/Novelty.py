@@ -5,7 +5,7 @@ import matplotlib.cm as cm
 import numpy as np
 import seaborn as sns
 from Farol import Farol
-from Agent import AgenteLearner
+from Farol.AgentFarol import AgenteLearner
 
 class Novelty:
     def crossover(self, parent1, parent2, farol):

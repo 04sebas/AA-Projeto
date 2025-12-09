@@ -1,43 +1,25 @@
+import os
 import random
-
-from matplotlib import lines, pyplot as plt, cm, patches
+from matplotlib import pyplot as plt, patches
 import numpy as np
-
-### Classes que representam os objetos no ambiente ###
-
-class Ground:
-    def __init__(self, x, y):
-        self.name = "Ground"
-        self.x = x
-        self.y = y
-
-class Wall:
-    def __init__(self, x, y):
-        self.name = "Wall"
-        self.x = x
-        self.y = y
-
-class Goal:
-    def __init__(self, xx, yy):
-        self.name = "Farol"
-        self.x = xx
-        self.y = yy
+from Recolecao.AgentRecolecao import AgenteRecolecao
+from Recolecao.Entities import Wall, Ground, Resource, Delivery
 
 ### Classe que representa o ambiente Farol ###
 
-class Farol:
+class AmbienteRecolecao:
 
-    ## Construtor da classe Farol --- lê o ficheiro de texto e cria o ambiente ( Tamanho fixo 100x100 ) ##
+    ## Construtor da classe Recolecao --- lê o ficheiro de texto e cria o ambiente ( Tamanho fixo 50x50 ) ##
     def __init__(self, file):
 
-        self.grid, self.goalx, self.goaly, self.walls = self.load_grid_from_file(file)
-        self.size = 100
-        self.agentx, self.agenty = self.random_valid_position()
+        self.grid, self.walls, self.resources, self.deliveryPoints = self.load_grid_from_file(file)
+        self.size = 50
+        self.agentes = []
 
+    def load_grid_from_file(self, filename):
 
-    ## Função que carrega o grid a partir de um ficheiro de texto ##
-
-    def load_grid_from_file(self, path):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base_dir, filename)
 
         ## Lê o ficheiro e cria a matriz que representa o ambiente ##
         with open(path, "r") as f:
@@ -50,7 +32,8 @@ class Farol:
         grid = np.zeros((height, width), dtype=np.int8)
 
         #--- Preenche a grid com os objetos correspondentes --- ##
-        goalx = goaly = None
+        resources = []
+        deliveryPoints = []
         walls = []
 
         for y, line in enumerate(lines): ## y inicial = 100
@@ -59,40 +42,32 @@ class Farol:
                 if ch == 'W':
                     grid[mapped_y, x] = 1
                     walls.append(Wall(x, mapped_y))
-                elif ch == 'F':
+                elif ch == 'R':
                     grid[mapped_y, x] = 2
-                    goalx, goaly = x, mapped_y
-
+                    resources.append(Resource(x, mapped_y))
+                elif ch == 'P':
+                    grid[mapped_y, x] = 3
+                    deliveryPoints.append(Delivery(x, mapped_y))
                 # O resto da grid fica a zero
 
-        return grid, goalx, goaly, walls ## Retorna a grid, coordenadas do farol e lista de walls ##
+        return grid , walls, resources, deliveryPoints ## Retorna a grid
 
     def get_object_here(self, x, y): ## Função que retorna o objeto na posição (x,y)
+
+        for agente in self.agentes:
+            if agente.x == x and agente.y == y:
+                return agente
+
         objectInGrid = self.grid[y, x]
         if objectInGrid == 0:
             return Ground(x, y)
         elif objectInGrid == 1:
             return Wall(x, y)
         elif objectInGrid == 2:
-            return Goal(x, y)
+            return Resource(x, y)
+        elif objectInGrid == 3:
+            return Delivery(x, y)
         return None
-
-    def randomValidAction(self):
-        actions = []
-        #up
-        if self.agenty + 1 < self.size:
-            actions.append(0)
-        #down
-        if self.agenty - 1 > - 1:
-            actions.append(1)
-        #right
-        if self.agentx + 1 < self.size:
-            actions.append(2)
-        #left
-        if self.agentx - 1 > - 1:
-            actions.append(3)
-
-        return random.choice(actions)
 
     def random_valid_position(self):
 
@@ -103,16 +78,15 @@ class Farol:
             x = random.randint(0, self.size - 1)
             y = random.randint(0, self.size - 1)
             obj = self.get_object_here(x, y)
-            if not isinstance(obj, (Wall, Goal)):
+            if isinstance(obj, Ground):
                 return x, y
             attempts += 1
 
         return 0,0
 
     def reset(self):
-        self.grid, self.goalx, self.goaly, self.walls = self.load_grid_from_file("Farol.txt")
-        self.size = 100
-        self.agentx, self.agenty = self.random_valid_position()
+        self.grid, self.walls, self.resources, self.deliveryPoints = self.load_grid_from_file("Recolecao.txt")
+        self.size = 50
 
     def observation(self, x, y, depth=3):
         obs = {0: [], 1: [], 2: [], 3: []}  # up, down, left, right
@@ -138,14 +112,16 @@ class Farol:
 
         return obs
 
+    def consume(self, obj):
+        self.grid[obj.y, obj.x] = 0
 
 if __name__ == "__main__":
-    farol = Farol("Farol.txt")
+    rec = AmbienteRecolecao("Recolecao.txt")
     ##### PATH PLOT #####
     fig, ax = plt.subplots(figsize=(10, 10))
 
     # Plot walls and goal
-    for wall in farol.walls:
+    for wall in rec.walls:
         ax.add_patch(
             patches.Rectangle(
                 (wall.x - 0.5, wall.y - 0.5),  # lower-left corner
@@ -154,12 +130,19 @@ if __name__ == "__main__":
             )
         )
 
-    ax.text(farol.goalx, farol.goaly, "G", color='green', fontsize=9, ha='center', va='center', fontweight='bold')
+    for resource in rec.resources:
+        ax.text(resource.x, resource.y, "R", color='green', fontsize=9, ha='center', va='center', fontweight='bold')
+
+    for delivery in rec.deliveryPoints:
+        ax.text(delivery.x, delivery.y, "P", color='red', fontsize=9, ha='center', va='center', fontweight='bold')
+
+    for agente in rec.agentes:
+        ax.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
     # Plot paths
 
-    ax.set_xlim(-1, 100)
-    ax.set_ylim(-1, 100)
-    ax.set_title("Best Agent Paths Over Generations")
+    ax.set_xlim(-1, 50)
+    ax.set_ylim(-1, 50)
+    ax.set_title("Recolecao")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     plt.grid(True)

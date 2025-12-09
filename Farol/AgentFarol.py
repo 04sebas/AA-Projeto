@@ -1,8 +1,8 @@
+import math
 import random
 
 from numpy import argmax
-
-from AmbienteFarol import Goal, Wall, Ground
+from Farol.AmbienteFarol import Goal, Wall, Ground
 import numpy as np
 
 class AgenteLearner :
@@ -69,7 +69,10 @@ class AgenteLearner :
         return (abs(x - self.farol.goalx) + abs(y - self.farol.goaly))/ self.farol.size
 
     def distance_to_goal_agent(self):
-        return (abs(self.x - self.farol.goalx) + abs(self.y - self.farol.goaly)) / self.farol.size
+        #return (abs(self.x - self.farol.goalx) + abs(self.y - self.farol.goaly)) / self.farol.size
+        dx = self.x - self.farol.goalx
+        dy = self.y - self.farol.goaly
+        return math.sqrt(dx * dx + dy * dy) / self.farol.size
 
     def step(self, action_index):
 

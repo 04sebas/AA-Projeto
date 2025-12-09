@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, patches
 from numpy import argmax
-import Agent
-import AmbienteFarol
+from Farol import AmbienteFarol, AgentFarol
 import NeuralNetwork
 
 
@@ -35,7 +34,7 @@ class DqnSimulation:
         self.batch_size = 32
         self.target_update_freq = 50
         memory_size = 50000
-        self.episodes = 500
+        self.episodes = 100
         self.action_map = [(0, 1), (0, -1), (-1, 0), (1, 0)]
 
         # Initialize Q-networks
@@ -138,7 +137,7 @@ class DqnSimulation:
 
             print(f"Episode {episode + 1} start")
 
-            agent = Agent.AgenteLearner(self.amb, None)
+            agent = AgentFarol.AgenteLearner(self.amb, None)
 
             self.amb.reset()
 
@@ -160,10 +159,17 @@ class DqnSimulation:
             print(f"Distance to goal {agent.distance_to_goal_agent()}\n")
 
         # Plotting the rewards per episode
-        plt.plot(rewards_per_episode)
-        plt.xlabel('Episode')
-        plt.ylabel('Reward')
-        plt.title('DQN')
+        window = 5
+        avg_rewards = [
+            np.mean(rewards_per_episode[i:i + window])
+            for i in range(0, len(rewards_per_episode), window)
+        ]
+
+        plt.plot(avg_rewards)
+        plt.xlabel('Episode (x5)')
+        plt.ylabel('Average Reward')
+        plt.title('DQN (Average Reward per 50 Episodes)')
+        plt.show()
 
         ##### PATH PLOT #####
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -182,7 +188,7 @@ class DqnSimulation:
         ax.text(self.amb.goalx, self.amb.goaly, "G", color='green', fontsize=9, ha='center', va='center',
                 fontweight='bold')
         # Plot paths
-        plot_gens = [0,50,100,150,200,250,300,350,400,450,499]
+        plot_gens = [0,10,20,30,40,50,60,70,80,90,99]
         for i in plot_gens:
             path = pathsPerEpisode[i]
             avg_fitness = rewards_per_episode[i]  # Get the avg combined fitness
