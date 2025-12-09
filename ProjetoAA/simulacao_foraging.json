@@ -14,7 +14,7 @@
                     10
                 ],
                 "quantidade": 5,
-                "valor": 10
+                "valor": -10
             },
             {
                 "pos": [
@@ -22,7 +22,7 @@
                     10
                 ],
                 "quantidade": 8,
-                "valor": 20
+                "valor": -20
             },
             {
                 "pos": [
@@ -30,7 +30,7 @@
                     40
                 ],
                 "quantidade": 15,
-                "valor": 5
+                "valor": -5
             },
             {
                 "pos": [
@@ -38,7 +38,7 @@
                     50
                 ],
                 "quantidade": 10,
-                "valor": 15
+                "valor": -15
             },
             {
                 "pos": [

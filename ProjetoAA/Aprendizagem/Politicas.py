@@ -50,9 +50,9 @@ def direcao_para_alvo(pos, alvo, obsts, largura=None, altura=None, ultima_direca
     if pos == alvo:
         return "ficar"
     if largura is None:
-        largura = 1000
+        largura = 100
     if altura is None:
-        altura = 1000
+        altura = 100
 
     def heur(a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])

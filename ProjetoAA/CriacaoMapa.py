@@ -50,7 +50,6 @@ obstaculos = []
 
 obstaculos += [{"pos": [i, 25]} for i in range(50, 75)]
 obstaculos += [{"pos": [i, 75]} for i in range(10, 50)]
-
 obstaculos += [{"pos": [25, i]} for i in range(30, 75)]
 obstaculos += [{"pos": [75, i]} for i in range(20, 80)]
 
