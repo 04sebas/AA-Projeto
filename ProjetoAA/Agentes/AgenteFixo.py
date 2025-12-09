@@ -120,8 +120,7 @@ class AgenteFixo(Agente):
         if p_tipo == "random":
             return politica_aleatoria()
         if p_tipo == "greedy":
-            if getattr(obs, "carga",
-                       0) == 0 and self.ultimo_recurso and self.ultimo_recurso in self.recursos_conhecidos:
+            if getattr(obs, "carga",0) == 0 and self.ultimo_recurso and self.ultimo_recurso in self.recursos_conhecidos:
                 return politica_greedy(self, obs, alvo_forcado=self.ultimo_recurso)
             if getattr(obs, "carga", 0) > 0 and self.ultimo_ninho:
                 return politica_greedy(self, obs, alvo_forcado=self.ultimo_ninho)
