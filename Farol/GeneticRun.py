@@ -3,8 +3,8 @@ from matplotlib import patches
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-from AmbienteFarol import Wall, Farol
-from Agent import AgenteLearner
+from Farol.AmbienteFarol import Farol
+from Farol.AgentFarol import AgenteLearner
 import NeuralNetwork
 
 
