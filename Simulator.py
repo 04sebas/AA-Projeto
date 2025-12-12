@@ -1,6 +1,9 @@
+import random
+
 from Farol import GeneticRun
 from Farol.DQNRun import DqnSimulation
 from Recolecao import GeneticRecolecaoRun
+from Recolecao.AgentRecolecao import AgenteRecolecao
 from Recolecao.AmbienteRecolecao import AmbienteRecolecao
 
 
@@ -35,11 +38,12 @@ class Simulator:
         a.geneticRun(True)
 
 if __name__ == "__main__":
-    sim = Simulator("Recolecao")
+    sim = Simulator("Farol")
     if sim.farol:
         print("RUNNING FAROL")
         sim.runSimulationFarol()
     if sim.recolecao:
+
         print("RUNNING RECOLECAO")
         sim.runSimulationRecolecao()
 
