@@ -63,7 +63,7 @@
   "agentes": [
     {
       "tipo": "AgenteFixo",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "politica": {
         "tipo": "greedy",
@@ -72,7 +72,7 @@
     },
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "tipo_estrategia": "dqn",
       "sensores": 2,
@@ -82,9 +82,9 @@
     {
       "tipo": "AgenteAprendizagem",
       "quantidade": 1,
-      "posicao_inicial": "random",
+      "posicao_inicial": [0,0],
       "tipo_estrategia": "genetica",
-      "sensores": 2,
+      "sensores": 3,
       "trainable": true,
       "nome_base": "Genetico"
     }

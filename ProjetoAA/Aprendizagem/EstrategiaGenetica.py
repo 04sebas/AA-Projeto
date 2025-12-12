@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from ProjetoAA.Agentes.AgenteAprendizagem import AgenteAprendizagem
+from ProjetoAA.Ambientes.AmbienteFarol import AmbienteFarol
 from ProjetoAA.Objetos.Accao import Accao
 from ProjetoAA.Aprendizagem.RedeNeuronal import create_network_architecture
 
@@ -65,7 +66,17 @@ class EstrategiaGenetica:
         self.fitness = np.zeros(self.populacao_tamanho, dtype=np.float32)
 
     def run(self, ambiente, verbose=True):
+        dummy_agent = AgenteAprendizagem(politica={"alcance": 3})
+        if hasattr(ambiente, "get_action_names"):
+            dummy_agent.set_action_space(ambiente.get_action_names())
+        input_size = dummy_agent.get_input_size()
+        num_actions = len(dummy_agent.nomes_accao)
+        available_actions = dummy_agent.nomes_accao
+        sensor_range = getattr(dummy_agent.sensores, "alcance", 3)
+        self.nn_arch = (input_size, num_actions, self.nn_arch[2] if len(self.nn_arch) > 2 else (16, 8))
+
         self._init_population()
+
         best_paths_per_gen = []
         avg_fitness_per_gen = []
         last_generation = []
@@ -83,16 +94,23 @@ class EstrategiaGenetica:
             for i, weights in enumerate(self.populacao):
                 nn = create_network_architecture(*self.nn_arch)
                 nn.load_weights(weights)
-                agent = AgenteAprendizagem()
+
+                agent = AgenteAprendizagem(politica={"alcance": sensor_range}, nomes_accao=available_actions)
                 agent.neural_network = nn
                 agent.weights = weights.copy()
 
-                start = ambiente.posicao_aleatoria()
+                agent.path = []
+                agent.found_goal = False
+                agent.recompensa_total = 0.0
+
+                if isinstance(ambiente, AmbienteFarol):
+                    start = ambiente.posicao_aleatoria_treino()
+                else:
+                    start = [0,0]
+
                 ambiente.posicoes[agent] = tuple(start)
                 agent.pos = tuple(start)
                 agent.path = [agent.pos]
-                agent.found_goal = False
-
                 fitness = 0.0
 
                 for step in range(self.passos_por_avaliacao):

@@ -1,5 +1,4 @@
 import math
-import random
 from ProjetoAA.Ambientes.Ambiente import Ambiente
 from ProjetoAA.Objetos.Observacao import Observacao
 
@@ -49,7 +48,14 @@ class AmbienteFarol(Ambiente):
         pos = list(self.posicoes.get(agente, (0, 0)))
         x, y = pos
 
-        if accao.nome == "cima":
+        if accao.nome == "recolher" or (x, y) == self.pos_farol:
+            recurso = self.recursos.get((x, y))
+            if recurso is not None:
+                valor = recurso.get("valor", 1500)
+                agente.found_goal = True
+                return valor
+            return -0.1
+        elif accao.nome == "cima":
             dx, dy = (0, 1)
         elif accao.nome == "baixo":
             dx, dy = (0, -1)
@@ -61,6 +67,8 @@ class AmbienteFarol(Ambiente):
             dx, dy = (0, 0)
 
         newx, newy = x + dx, y + dy
+
+
 
         if not (0 <= newx < self.largura and 0 <= newy < self.altura):
             return -1
@@ -77,45 +85,9 @@ class AmbienteFarol(Ambiente):
 
         reward = -0.05
         if new_dist < prev_dist:
-            reward = 1.0
-
-        if accao.nome == "recolher" or (newx, newy) == self.pos_farol:
-            recurso = self.recursos.get((newx, newy))
-            if recurso is not None:
-                valor = recurso.get("valor", 1500)
-                agente.found_goal = True
-                return valor
-            return -0.1
+            reward += 1.0
 
         return reward
-
-    def posicao_aleatoria(self):
-        cols = 3
-        rows = 3
-        passo_x = self.largura // (cols + 1)
-        passo_y = self.altura // (rows + 1)
-        posicoes = []
-
-        for r in range(1, rows + 1):
-            for c in range(1, cols + 1):
-                x = passo_x * c
-                y = passo_y * r
-                pos = (x, y)
-
-                if pos in self.obstaculos or pos in self.recursos:
-                    continue
-
-                posicoes.append(pos)
-
-        if not posicoes:
-            while True:
-                x = random.randint(0, self.largura - 1)
-                y = random.randint(0, self.altura - 1)
-                pos = (x, y)
-                if pos not in self.obstaculos and pos not in self.recursos:
-                    return pos
-
-        return random.choice(posicoes)
 
     def atualizacao(self):
         self.tempo += 1
@@ -130,7 +102,6 @@ class AmbienteFarol(Ambiente):
         dist = math.sqrt(dx * dx + dy * dy)
         max_dist = math.sqrt(self.largura * self.largura + self.altura * self.altura)
         return dist / max_dist
-
 
 
 

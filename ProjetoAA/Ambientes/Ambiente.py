@@ -1,3 +1,4 @@
+import random
 from abc import ABC, abstractmethod
 
 from ProjetoAA.Agentes.Agente import Agente
@@ -48,5 +49,40 @@ class Ambiente(ABC):
         if (x, y) in self.obstaculos:
             return False
         return True
+
+    def posicao_aleatoria(self):
+        cols = 3
+        rows = 3
+        passo_x = self.largura // (cols + 1)
+        passo_y = self.altura // (rows + 1)
+        posicoes = []
+
+        for r in range(1, rows + 1):
+            for c in range(1, cols + 1):
+                x = passo_x * c
+                y = passo_y * r
+                pos = (x, y)
+
+                if pos in self.obstaculos or pos in self.recursos:
+                    continue
+
+                posicoes.append(pos)
+
+        if not posicoes:
+            while True:
+                x = random.randint(0, self.largura - 1)
+                y = random.randint(0, self.altura - 1)
+                pos = (x, y)
+                if pos not in self.obstaculos and pos not in self.recursos:
+                    return pos
+
+        return random.choice(posicoes)
+
+    def posicao_aleatoria_treino(self):
+        while True:
+            x = random.randint(0, self.largura - 1)
+            y = random.randint(0, self.altura - 1)
+            if (x, y) not in self.obstaculos and (x,y) not in self.recursos:
+                return x, y
 
 
