@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 from ProjetoAA.Agentes.AgenteAprendizagem import AgenteAprendizagem
 from ProjetoAA.Agentes.AgenteFixo import AgenteFixo
 from ProjetoAA.Ambientes.AmbienteFarol import AmbienteFarol
+from ProjetoAA.Ambientes.AmbienteForaging import AmbienteForaging
 from ProjetoAA.Aprendizagem.EstrategiaGenetica import EstrategiaGenetica
 from ProjetoAA.Aprendizagem.EstrategiaQLearning import EstrategiaDQN
 
@@ -80,15 +81,24 @@ class MotorDeSimulacao:
 
     def _cria_ambiente(self, config_ambiente):
         tipo_ambiente = config_ambiente.get("tipo", "AmbienteFarol")
+
         if tipo_ambiente == "AmbienteFarol":
             self.ambiente = AmbienteFarol(
                 largura=config_ambiente.get("largura", 100),
                 altura=config_ambiente.get("altura", 100),
-                pos_farol=tuple(config_ambiente.get("pos_farol", [50,75])),
+                pos_farol=tuple(config_ambiente.get("pos_farol", [50, 75])),
+                obstaculos=config_ambiente.get("obstaculos", [])
+            )
+        elif tipo_ambiente == "AmbienteForaging":
+            self.ambiente = AmbienteForaging(
+                largura=config_ambiente.get("largura", 100),
+                altura=config_ambiente.get("altura", 100),
+                recursos=config_ambiente.get("recursos", []),
+                ninhos=config_ambiente.get("ninhos", []),
                 obstaculos=config_ambiente.get("obstaculos", [])
             )
         else:
-            self.ambiente = AmbienteFarol()
+            raise ValueError(f"Tipo de ambiente desconhecido: {tipo_ambiente}")
 
     def _obter_config_estrategia(self, tipo_estrategia):
         for e in self.config_estrategias:
@@ -170,7 +180,26 @@ class MotorDeSimulacao:
             if conf is None:
                 conf = self._obter_config_estrategia(tipo or "genetica")
 
-            input_size = (2 * agente.sensores.alcance + 1) ** 2 - 1 + 3
+            available_actions = ["cima", "baixo", "direita", "esquerda"]
+            if getattr(self.ambiente, "recursos", None):
+                if "recolher" not in available_actions:
+                    available_actions.append("recolher")
+            if getattr(self.ambiente, "ninhos", None):
+                if "depositar" not in available_actions:
+                    available_actions.append("depositar")
+
+            if hasattr(agente, "set_action_space"):
+                agente.set_action_space(available_actions)
+            else:
+                agente.nomes_accao = available_actions
+
+            try:
+                input_size = agente.get_input_size()
+            except Exception:
+                alcance = getattr(agente.sensores, "alcance", 3)
+                input_size = (2 * alcance + 1) ** 2 - 1 + 3
+
+            output_size = len(available_actions)
 
             if tipo == "genetica":
                 ga = EstrategiaGenetica(
@@ -179,8 +208,8 @@ class MotorDeSimulacao:
                     num_geracoes=conf.get("num_ger", 25),
                     tamanho_torneio=conf.get("tamanho_torneio", 3),
                     elitismo_frac=conf.get("elitismo_frac", 0.2),
-                    nn_arch=(input_size, 4, conf.get("hidden", (16, 8))),
-                    passos_por_avaliacao=conf.get("passos_por_avaliacao", 1000),
+                    nn_arch=(input_size, output_size, conf.get("hidden", (16, 8))),
+                    passos_por_avaliacao=conf.get("passos_por_avaliacao", 750),
                     mutation_std=conf.get("mutation_std", 0.1),
                 )
 
@@ -208,13 +237,13 @@ class MotorDeSimulacao:
             elif tipo == "dqn":
                 dqn_conf = conf or {}
                 dqn = EstrategiaDQN(
-                    nn_arch=(input_size, 4, dqn_conf.get("hidden", (16, 8))),
+                    nn_arch=(input_size, output_size, dqn_conf.get("hidden", (16, 8))),
                     episodes=dqn_conf.get("episodes", 100),
-                    passos_por_ep=dqn_conf.get("passos_por_ep", 1000),
+                    passos_por_ep=dqn_conf.get("passos_por_ep", 750),
                     gamma=dqn_conf.get("gamma", 0.99),
-                    epsilon=dqn_conf.get("epsilon", 0.5),
+                    epsilon=dqn_conf.get("epsilon", 0.90),
                     epsilon_min=dqn_conf.get("epsilon_min", 0.1),
-                    epsilon_decay=dqn_conf.get("epsilon_decay", 0.995),
+                    epsilon_decay=dqn_conf.get("epsilon_decay", 0.95),
                     batch_size=dqn_conf.get("batch_size", 32),
                     target_update_freq=dqn_conf.get("target_update_freq", 50),
                     memory_size=dqn_conf.get("memory_size", 50000),
@@ -312,31 +341,52 @@ class MotorDeSimulacao:
     def visualizar_caminhos(self):
         altura = self.ambiente.altura
         largura = self.ambiente.largura
-        plt.figure(figsize=(8,8))
-        cores = plt.cm.tab20(np.linspace(0,1,max(1,len(self.historico_agentes))))
+        plt.figure(figsize=(10, 10))
+        cores = plt.cm.tab20(np.linspace(0, 1, max(1, len(self.historico_agentes))))
         for i, (agente, caminho) in enumerate(self.historico_agentes.items()):
+            if not caminho:
+                continue
             xs = [p[0] for p in caminho]
             ys = [p[1] for p in caminho]
-            plt.plot(xs, ys, marker='.', linewidth=1, color=cores[i], label=f"Agente {i}")
-            plt.scatter(xs[0], ys[0], c=[cores[i]], marker='o', s=80)
-            plt.scatter(xs[-1], ys[-1], c=[cores[i]], marker='x', s=80)
-        if hasattr(self.ambiente, "pos_farol"):
-            farol_x, farol_y = self.ambiente.pos_farol
-            plt.scatter([farol_x], [farol_y], color="red", marker="*", s=300, label="Farol")
+            plt.plot(xs, ys, marker='.', linewidth=1, color=cores[i], label=f"{getattr(agente, 'nome', f'Agente {i}')}")
+            # start / end markers
+            plt.scatter(xs[0], ys[0], c=[cores[i]], marker='o', s=80)  # início
+            plt.scatter(xs[-1], ys[-1], c=[cores[i]], marker='x', s=80)  # fim
+
+        # Plotar recursos (suporta dict ou lista)
         recursos = getattr(self.ambiente, "recursos", None)
+        recursos_items = []
         if recursos:
             if isinstance(recursos, dict):
-                itens = recursos.items()
+                recursos_items = list(recursos.items())
             else:
-                itens = []
+                # lista de objetos/dicts com "pos", "quantidade", "valor"
+                recursos_items = []
                 for r in recursos:
-                    pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list,tuple)) else None
+                    pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
                     if pos is not None:
-                        itens.append((pos, r))
-            for pos, info in itens:
+                        recursos_items.append((pos, r))
+
+        if recursos_items:
+            valores = [info.get("valor", info.get("quantidade", 1)) for (_p, info) in recursos_items]
+            quantidades = [info.get("quantidade", 1) for (_p, info) in recursos_items]
+            min_val, max_val = min(valores), max(valores)
+            span = max(1e-6, max_val - min_val)
+            cmap = plt.get_cmap("RdYlBu")
+            for (pos, info), val, q in zip(recursos_items, valores, quantidades):
                 x, y = pos
-                plt.scatter([x], [y], s=80, marker='o', label="_nolegend_", alpha=0.7)
-                plt.text(x + 0.1, y + 0.1, str(info.get("valor", info.get("quantidade",1))), fontsize=8)
+                size = max(40, 40 + (q - min(quantidades)) * 4)
+                norm = (val - min_val) / span
+                color = cmap(norm)
+                plt.scatter([x], [y], s=size, marker='o', color=color, alpha=0.8, edgecolors='k')
+                plt.text(x + 0.2, y + 0.2, f"q:{q}\nv:{val}", fontsize=7)
+
+        ninhos = getattr(self.ambiente, "ninhos", None)
+        if ninhos:
+            nx = [p[0] for p in ninhos]
+            ny = [p[1] for p in ninhos]
+            plt.scatter(nx, ny, s=200, marker='^', color='gold', edgecolors='k', label="Ninhos")
+
         obs_raw = getattr(self.ambiente, "obstaculos_raw", None)
         if obs_raw:
             obs_x = [p["pos"][0] for p in obs_raw]
@@ -349,35 +399,39 @@ class MotorDeSimulacao:
             else:
                 obs_x, obs_y = [], []
         if obs_x:
-            plt.scatter(obs_x, obs_y, color="black", marker="s", s=80, label="Obstáculos")
-        if hasattr(self, "recursos_iniciais"):
-            for pos, info in self.recursos_iniciais.items():
-                x, y = pos
-                atual = self.ambiente.recursos.get(pos, {}).get("quantidade", 0)
-                cor = "blue" if atual > 0 else "gray"
-                plt.scatter([x], [y], s=80, marker='o', color=cor)
-                plt.text(x + 0.1, y + 0.1, f"ini:{info['quantidade']}\nact:{atual}", fontsize=7)
+            plt.scatter(obs_x, obs_y, color="black", marker='s', s=120, label="Obstáculos")
+
+        if hasattr(self.ambiente, "pos_farol"):
+            farol_x, farol_y = self.ambiente.pos_farol
+            plt.scatter([farol_x], [farol_y], color="red", marker="*", s=300, label="Farol")
+
         ax = plt.gca()
         ax.set_xlim(-0.5, largura - 0.5)
         ax.set_ylim(-0.5, altura - 0.5)
         ax.set_aspect('equal', adjustable='box')
+
         xticks = np.arange(0, largura, max(1, largura // 10))
         yticks = np.arange(0, altura, max(1, altura // 10))
         ax.set_xticks(xticks)
         ax.set_yticks(yticks)
         ax.set_xticklabels(xticks)
         ax.set_yticklabels(yticks)
+
         plt.xlabel("X")
         plt.ylabel("Y")
         plt.title("Trajetórias dos Agentes no Ambiente")
-        plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(loc='upper right', bbox_to_anchor=(1.25, 1))
         plt.grid(True)
+        plt.tight_layout()
         plt.show()
 
+
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulacao_farol.json")
+    simulador = MotorDeSimulacao().cria("simulacao_foraging.json")
     if simulador.ativo:
-        """""
+        ""
         for idx, agente in enumerate(simulador.agentes):
             if not isinstance(agente, AgenteAprendizagem):
                 continue
@@ -385,9 +439,9 @@ if __name__ == "__main__":
                 continue
 
             try:
-                simulador.carregar_rede(f"models/AmbienteFarol_agente{idx}_nn.pkl",idx)
+                simulador.carregar_rede(f"models/AmbienteFarol_agente0_nn.pkl",idx)
             except FileNotFoundError:
                 print(f"[LOAD] NN não encontrada para agente {idx}, será usado aleatório.")
-                """""
-        simulador.fase_treino()
+                ""
+        #simulador.fase_treino()
         simulador.fase_teste()

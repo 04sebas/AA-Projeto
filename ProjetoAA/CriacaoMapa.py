@@ -30,28 +30,28 @@ mapa = {
             "posicao_inicial": "random",
             "politica": {
                 "tipo": "greedy",
-                "alcance": 15,
+                "alcance": 5,
                 "stuck_threshold": 3
             }
         },
         {
-            "tipo": "AgenteFixo",
-            "quantidade": 2,
+            "tipo": "AgenteAprendizagem",
+            "quantidade": 1,
             "posicao_inicial": "random",
-            "politica": {
-                "tipo": "random",
-                "alcance": 5
-            }
+            "tipo_estrategia": "genetica",
+            "sensores": 3,
+            "trainable": True,
+            "nome_base": "Genetico"
         }
     ]
 }
 
 obstaculos = []
 
-obstaculos += [{"pos": [i, 25]} for i in range(50, 75)]
-obstaculos += [{"pos": [i, 75]} for i in range(10, 50)]
-obstaculos += [{"pos": [25, i]} for i in range(30, 75)]
-obstaculos += [{"pos": [75, i]} for i in range(20, 80)]
+#obstaculos += [{"pos": [i, 25]} for i in range(50, 75)]
+#obstaculos += [{"pos": [i, 75]} for i in range(10, 50)]
+#obstaculos += [{"pos": [25, i]} for i in range(30, 75)]
+#obstaculos += [{"pos": [75, i]} for i in range(20, 80)]
 
 mapa["ambiente"]["obstaculos"] = obstaculos
 
