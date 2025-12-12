@@ -43,14 +43,13 @@ class AmbienteForaging(Ambiente):
             })
 
         obs = Observacao(percepcoes)
-
         obs.posicao = pos
         obs.carga = self.cargas.get(agente, 0)
-
         obs.largura = self.largura
         obs.altura = self.altura
-
         agente.ultima_obs = obs
+        obs.goal = None
+        obs.foraging = True
 
         return obs
 

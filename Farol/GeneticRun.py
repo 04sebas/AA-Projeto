@@ -3,9 +3,9 @@ from matplotlib import patches
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-from Farol.AmbienteFarol import Farol
 from Farol.AgentFarol import AgenteLearner
 import NeuralNetwork
+from Farol.AmbienteFarol import Farol
 
 
 class GeneticSimulation:
