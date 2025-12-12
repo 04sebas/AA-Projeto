@@ -35,7 +35,6 @@ class NeuralNetwork:
         outputs = activation_function(z)
         return outputs
 
-
     def load_weights(self, weights):
         w = np.array(weights)
         self.weights = w

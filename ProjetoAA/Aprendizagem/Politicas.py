@@ -1,7 +1,8 @@
 import math
 import heapq
 import random
-from Objetos.Accao import Accao
+
+from ProjetoAA.Objetos.Accao import Accao
 
 DIRECOES = {
     "cima": (0, -1),
@@ -131,7 +132,7 @@ def politica_greedy(agente, obs, alvo_forcado=None):
             if dir_nome:
                 dx, dy = DIRECOES[dir_nome]
                 cand = (pos[0] + dx, pos[1] + dy)
-                if 0 <= cand[0] < (largura or 1000) and 0 <= cand[1] < (altura or 1000) and cand not in obsts:
+                if 0 <= cand[0] < (largura or 100) and 0 <= cand[1] < (altura or 100) and cand not in obsts:
                     agente.ultima_direcao = dir_nome
                     return Accao(dir_nome)
         prefer = None

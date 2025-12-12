@@ -1,20 +1,21 @@
 import random
-import copy
 import numpy as np
-from Aprendizagem.EstrategiaAprendizagem import EstrategiaAprendizagem
-from Aprendizagem import NeuralNetwork
+from ProjetoAA.Agentes.AgenteAprendizagem import AgenteAprendizagem
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Aprendizagem.RedeNeuronal import create_network_architecture
 
-class EstrategiaGenetica(EstrategiaAprendizagem):
+
+class EstrategiaGenetica:
     def __init__(
         self,
-        populacao_tamanho: int = 50,
-        taxa_mutacao: float = 0.01,
-        num_geracoes: int = 25,
-        tamanho_torneio: int = 3,
-        elitismo_frac: float = 0.2,
-        nn_arch=(4, 4, (16, 8)),
-        passos_por_avaliacao: int = 500,
-        mutation_std: float = 0.1,
+        populacao_tamanho=100,
+        taxa_mutacao=0.01,
+        num_geracoes=25,
+        tamanho_torneio=3,
+        elitismo_frac=0.2,
+        nn_arch=(15, 4, (16, 8)),
+        passos_por_avaliacao=1000,
+        mutation_std=0.1,
     ):
         self.indice_atual = None
         self.populacao_tamanho = int(populacao_tamanho)
@@ -22,20 +23,13 @@ class EstrategiaGenetica(EstrategiaAprendizagem):
         self.num_geracoes = int(num_geracoes)
         self.tamanho_torneio = int(tamanho_torneio)
         self.elitismo_frac = float(elitismo_frac)
-        self.nn_arch = nn_arch
+        self.nn_arch = tuple(nn_arch)
         self.passos_por_avaliacao = int(passos_por_avaliacao)
         self.mutation_std = float(mutation_std)
 
-        template_nn = NeuralNetwork.create_network_architecture(*self.nn_arch)
-        self.num_weights = template_nn.compute_num_weights()
-
-        self.populacao = [
-            np.random.uniform(-1.0, 1.0, self.num_weights).astype(np.float32)
-            for _ in range(self.populacao_tamanho)
-        ]
-
-        self.fitness = np.zeros(self.populacao_tamanho, dtype=np.float64)
-
+        self.num_weights = None
+        self.populacao = None
+        self.fitness = None
         self.treinada = False
         self.best_individuo = None
         self.best_neural_network = None
@@ -45,7 +39,7 @@ class EstrategiaGenetica(EstrategiaAprendizagem):
         best = max(competitors, key=lambda i: self.fitness[i])
         return best
 
-    def _crossover(self, w1: np.ndarray, w2: np.ndarray):
+    def _crossover(self, w1, w2):
         if self.num_weights <= 1:
             return w1.copy(), w2.copy()
         point = random.randint(1, self.num_weights - 1)
@@ -53,227 +47,239 @@ class EstrategiaGenetica(EstrategiaAprendizagem):
         child2 = np.concatenate([w2[:point], w1[point:]]).astype(np.float32)
         return child1, child2
 
-    def _mutar(self, w: np.ndarray) -> np.ndarray:
-        w = w.copy()
+    def _mutate_weights(self, weights):
+        w = weights.copy()
         mask = np.random.rand(self.num_weights) < self.taxa_mutacao
-        if mask.any():
-            noise = np.random.normal(0.0, self.mutation_std, size=self.num_weights)
-            w[mask] += noise[mask]
+        if np.any(mask):
+            w[mask] += np.random.randn(np.sum(mask)).astype(np.float32) * self.mutation_std
         return w
 
-    def _avaliar_individuo(self, pesos: np.ndarray, ambiente) -> float:
-        nn = NeuralNetwork.create_network_architecture(*self.nn_arch)
-        nn.load_weights(pesos)
+    def _init_population(self):
+        nn_proto = create_network_architecture(*self.nn_arch)
+        self.num_weights = int(nn_proto.compute_num_weights())
+        pop = []
+        for _ in range(self.populacao_tamanho):
+            w = np.random.uniform(-1.0, 1.0, size=(self.num_weights,)).astype(np.float32)
+            pop.append(w)
+        self.populacao = pop
+        self.fitness = np.zeros(self.populacao_tamanho, dtype=np.float32)
 
-        class _EvalAgent:
-            def __init__(self, ambiente_ref):
-                self.ambiente = ambiente_ref
-                if hasattr(self.ambiente, "agentx") and hasattr(self.ambiente, "agenty"):
-                    self.x = getattr(self.ambiente, "agentx")
-                    self.y = getattr(self.ambiente, "agenty")
-                elif hasattr(self.ambiente, "pos_agent_inicio"):
-                    self.x, self.y = self.ambiente.pos_agent_inicio
-                else:
-                    self.x, self.y = 0, 0
+    def run(self, ambiente, verbose=True):
+        self._init_population()
+        best_paths_per_gen = []
+        avg_fitness_per_gen = []
+        last_generation = []
+        n_elite = max(1, int(self.elitismo_frac * self.populacao_tamanho))
 
-                self.recompensa_total = 0.0
-                self.foundGoal = False
-                self.path = [(self.x, self.y)]
-
-            def percepcao_inputs(self):
-                size = getattr(self.ambiente, "size", None)
-                if size is None:
-                    if hasattr(self.ambiente, "largura"):
-                        size = max(1, self.ambiente.largura)
-                    else:
-                        size = 100.0
-                return np.array([
-                    self.x / float(size),
-                    self.y / float(size),
-                    getattr(self.ambiente, "goalx", 0) / float(size),
-                    getattr(self.ambiente, "goaly", 0) / float(size)
-                ], dtype=np.float32)
-
-            def step_with_nn(self, nn_model):
-                inputs = self.percepcao_inputs()
-                out = nn_model.forward(inputs)
-                action_index = int(np.argmax(out))
-                action_map = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-                dx, dy = action_map[action_index]
-
-                newx = self.x + dx
-                newy = self.y + dy
-
-                size = getattr(self.ambiente, "size", None)
-                if size is None:
-                    if hasattr(self.ambiente, "largura"):
-                        size_x = self.ambiente.largura
-                    else:
-                        size_x = 100
-                    if hasattr(self.ambiente, "altura"):
-                        size_y = self.ambiente.altura
-                    else:
-                        size_y = 100
-                    in_bounds = (0 <= newx < size_x and 0 <= newy < size_y)
-                else:
-                    in_bounds = (0 <= newx < size and 0 <= newy < size)
-
-                if not in_bounds:
-                    self.recompensa_total += -1.0
-                    return False
-
-                obj = None
-                if hasattr(self.ambiente, "get_object_here"):
-                    obj = self.ambiente.get_object_here(newx, newy)
-
-                GoalClass = getattr(self.ambiente, "GoalClass", None)
-                WallClass = getattr(self.ambiente, "WallClass", None)
-
-                if obj is not None:
-                    if WallClass is not None and isinstance(obj, WallClass):
-                        self.recompensa_total += -1.0
-                        return False
-                    if GoalClass is not None and isinstance(obj, GoalClass):
-                        self.recompensa_total += 1000.0
-                        self.x, self.y = newx, newy
-                        self.path.append((self.x, self.y))
-                        self.foundGoal = True
-                        return True
-
-                prev_dist = None
-                if hasattr(self.ambiente, "goalx") and hasattr(self.ambiente, "goaly"):
-                    prev_dist = abs(self.x - self.ambiente.goalx) + abs(self.y - self.ambiente.goaly)
-                self.x, self.y = newx, newy
-                self.path.append((self.x, self.y))
-                new_dist = None
-                if hasattr(self.ambiente, "goalx") and hasattr(self.ambiente, "goaly"):
-                    new_dist = abs(self.x - self.ambiente.goalx) + abs(self.y - self.ambiente.goaly)
-
-                reward = 1
-                if (prev_dist is not None) and (new_dist is not None) and (new_dist < prev_dist):
-                    reward += 2
-                self.recompensa_total += reward
-                return False
-
-        if hasattr(ambiente, "clone"):
-            sim_env = ambiente.clone()
-        else:
-            sim_env = copy.deepcopy(ambiente)
-
-        eval_agent = _EvalAgent(sim_env)
-
-        if hasattr(sim_env, "random_valid_position"):
-            start_x, start_y = sim_env.random_valid_position()
-            eval_agent.x, eval_agent.y = start_x, start_y
-            eval_agent.path = [(start_x, start_y)]
-
-        for _ in range(self.passos_por_avaliacao):
-            done = eval_agent.step_with_nn(nn)
-            if getattr(eval_agent, "foundGoal", False):
-                break
-            if hasattr(sim_env, "atualizacao"):
-                sim_env.atualizacao()
-
-        return float(eval_agent.recompensa_total)
-
-    def run(self, ambiente, verbose: bool = True):
-        pop = self.populacao_tamanho
+        if verbose:
+            print(f"[GA] População: {self.populacao_tamanho}, Gerações: {self.num_geracoes}, Elite: {n_elite}")
 
         for gen in range(self.num_geracoes):
-            self.fitness = np.zeros(pop, dtype=np.float64)
+            if verbose:
+                print(f"[GA] Geração {gen + 1}/{self.num_geracoes}")
 
-            for i in range(pop):
-                pesos = self.populacao[i]
-                fitness = self._avaliar_individuo(pesos, ambiente)
+            per_generation_agents = []
+
+            for i, weights in enumerate(self.populacao):
+                nn = create_network_architecture(*self.nn_arch)
+                nn.load_weights(weights)
+                agent = AgenteAprendizagem()
+                agent.neural_network = nn
+                agent.weights = weights.copy()
+
+                start = ambiente.posicao_aleatoria()
+                ambiente.posicoes[agent] = tuple(start)
+                agent.pos = tuple(start)
+                agent.path = [agent.pos]
+                agent.found_goal = False
+
+                fitness = 0.0
+
+                for step in range(self.passos_por_avaliacao):
+                    obs = ambiente.observacao_para(agent)
+                    agent.observacao(obs)
+
+                    acc = agent.age()
+
+                    try:
+                        reward = ambiente.agir(acc, agent)
+                        if reward is None:
+                            reward = 0.0
+                    except Exception as e:
+                        if verbose:
+                            print(f"[GA] Erro ao executar agir (ind={i}): {e}")
+                        reward = -1.0
+
+                    fitness += float(reward)
+                    agent.path.append(agent.pos)
+
+                    if getattr(agent, "found_goal", False):
+                        break
+
                 self.fitness[i] = fitness
+                per_generation_agents.append(agent)
+
+            order = np.argsort(-self.fitness)
+            self.populacao = [self.populacao[idx] for idx in order]
+            self.fitness = self.fitness[order]
+            per_generation_agents = [per_generation_agents[idx] for idx in order]
+
+            best_fit = float(self.fitness[0])
+            avg_fit = float(np.mean(self.fitness))
+            avg_fitness_per_gen.append(avg_fit)
+
+            best_agent = per_generation_agents[0]
+            best_paths_per_gen.append(best_agent.path)
+
+            last_generation = per_generation_agents  # agentes ordenados da última avaliação
 
             if verbose:
-                avg_f = float(np.mean(self.fitness))
-                best_f = float(np.max(self.fitness))
-                best_idx = int(np.argmax(self.fitness))
-                print(f"[GA] Geração {gen+1}/{self.num_geracoes} | Avg fitness: {avg_f:.3f} | Best: {best_f:.3f} (idx {best_idx})")
+                print(f"[GA] Gen {gen + 1}: best={best_fit:.2f}, avg={avg_fit:.2f}")
 
-            n_elite = max(1, int(self.elitismo_frac * pop))
-            idx_sorted = np.argsort(self.fitness)[::-1]  # decrescente
-            elites = [self.populacao[int(idx)] for idx in idx_sorted[:n_elite]]
-            nova_pop = elites.copy()
-            while len(nova_pop) < pop:
-                p1 = self._selecionar_torneio()
-                p2 = self._selecionar_torneio()
-                child1, child2 = self._crossover(self.populacao[p1], self.populacao[p2])
-                child1 = self._mutar(child1)
-                child2 = self._mutar(child2)
-                nova_pop.append(child1)
-                if len(nova_pop) < pop:
-                    nova_pop.append(child2)
+            new_pop = []
+            for k in range(n_elite):
+                new_pop.append(self.populacao[k].copy())
 
-            self.populacao = nova_pop[:pop]
+            while len(new_pop) < self.populacao_tamanho:
+                parent_idx1 = self._selecionar_torneio()
+                parent_idx2 = self._selecionar_torneio()
+                w1 = self.populacao[parent_idx1].copy()
+                w2 = self.populacao[parent_idx2].copy()
 
-        if np.all(self.fitness == 0):
-            for i in range(pop):
-                self.fitness[i] = self._avaliar_individuo(self.populacao[i], ambiente)
+                child1, child2 = self._crossover(w1, w2)
+                child1 = self._mutate_weights(child1)
+                if len(new_pop) < self.populacao_tamanho:
+                    new_pop.append(child1)
+                if len(new_pop) < self.populacao_tamanho:
+                    child2 = self._mutate_weights(child2)
+                    new_pop.append(child2)
 
-        best_idx = int(np.argmax(self.fitness))
-        self.best_individuo = self.populacao[best_idx].copy()
-        best_nn = NeuralNetwork.create_network_architecture(*self.nn_arch)
-        best_nn.load_weights(self.best_individuo)
+            self.populacao = new_pop
+            self.fitness = np.zeros(self.populacao_tamanho, dtype=np.float32)
+
+        best_weights = self.populacao[0].copy()
+        best_nn = create_network_architecture(*self.nn_arch)
+        best_nn.load_weights(best_weights)
+
+        self.best_individuo = 0
         self.best_neural_network = best_nn
         self.treinada = True
 
         if verbose:
-            print(f"[GA] Treino concluído. Melhor idx: {best_idx} | fitness: {float(self.fitness[best_idx]):.3f}")
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib.patches as patches
+                import matplotlib.cm as cm
+                fig, ax = plt.subplots(figsize=(10, 10))
 
-    def escolher_acao(self, estado, acoes_possiveis):
-        index_to_action = {0: "cima", 1: "baixo", 2: "esquerda", 3: "direita"}
+                walls = getattr(ambiente, "paredes", None) or getattr(ambiente, "walls", None)
+                if walls:
+                    for wall in walls:
+                        if isinstance(wall, tuple) and len(wall) >= 2:
+                            wx, wy = wall[0], wall[1]
+                        else:
+                            wx, wy = getattr(wall, "x", None), getattr(wall, "y", None)
+                        if wx is not None and wy is not None:
+                            ax.add_patch(patches.Rectangle((wx - 0.5, wy - 0.5), 1, 1, facecolor='black'))
 
-        if self.treinada and self.best_neural_network is not None:
-            size = getattr(estado, "size", None)
-            if size is None:
-                if hasattr(estado, "largura"):
-                    size = max(1, estado.largura)
+                goalx = getattr(ambiente, "goalx", None)
+                goaly = getattr(ambiente, "goaly", None)
+                if goalx is None or goaly is None:
+                    goal_pos = getattr(ambiente, "goal_pos", None) or getattr(ambiente, "pos_farol", None) or getattr(
+                        ambiente, "goal", None)
+                    if isinstance(goal_pos, tuple) and len(goal_pos) >= 2:
+                        goalx, goaly = goal_pos[0], goal_pos[1]
+                    elif hasattr(goal_pos, "x") and hasattr(goal_pos, "y"):
+                        goalx, goaly = goal_pos.x, goal_pos.y
+
+                if goalx is not None and goaly is not None:
+                    ax.text(goalx, goaly, "G", color='green', fontsize=9, ha='center', va='center', fontweight='bold')
+
+                total_gens = len(best_paths_per_gen)
+                if total_gens == 0:
+                    total_gens = 1
+                plot_gens = list(range(min(24, total_gens)))
+                if total_gens - 1 not in plot_gens:
+                    plot_gens.append(total_gens - 1)
+
+                colors = cm.rainbow(np.linspace(0, 1, len(plot_gens)))
+
+                for idx_plot, i in enumerate(plot_gens):
+                    if i < 0 or i >= len(best_paths_per_gen):
+                        continue
+                    path = best_paths_per_gen[i]
+                    if not path:
+                        continue
+                    x_vals = [p[0] for p in path]
+                    y_vals = [p[1] for p in path]
+                    avg_label = avg_fitness_per_gen[i] if i < len(avg_fitness_per_gen) else 0.0
+                    ax.plot(x_vals, y_vals, label=f"Geração {i + 1} (Avg Fit: {avg_label:.2f})", alpha=0.7,
+                            color=colors[idx_plot])
+                    ax.plot(x_vals[-1], y_vals[-1], 'x', markersize=8, color=colors[idx_plot])
+
+                largura = getattr(ambiente, "largura", None)
+                altura = getattr(ambiente, "altura", None)
+                if largura is not None and altura is not None:
+                    ax.set_xlim(-1, largura + 1)
+                    ax.set_ylim(-1, altura + 1)
                 else:
-                    size = 100.0
+                    ax.set_xlim(-1, 100)
+                    ax.set_ylim(-1, 100)
 
-            inputs = np.array([
-                estado.posicao[0] / float(size),
-                estado.posicao[1] / float(size),
-                getattr(estado, "goalx", 0) / float(size),
-                getattr(estado, "goaly", 0) / float(size)
-            ], dtype=np.float32)
+                ax.set_title("Evolução dos Melhores Caminhos por Geração")
+                ax.set_xlabel("X")
+                ax.set_ylabel("Y")
+                ax.grid(True)
+                ax.legend()
+                plt.tight_layout()
 
-            out = self.best_neural_network.forward(inputs)
-            idx = int(np.argmax(out))
-            return index_to_action.get(idx, "cima")
+                plt.figure(figsize=(10, 5))
+                plt.plot(range(len(avg_fitness_per_gen)), avg_fitness_per_gen, marker='o')
+                plt.title("Fitness Médio por Geração")
+                plt.xlabel("Geração")
+                plt.ylabel("Fitness Médio")
+                plt.grid(True)
+                plt.tight_layout()
 
-        individuo = self.populacao[self.indice_atual] if 0 <= self.indice_atual < len(self.populacao) else self.populacao[0]
-        temp_nn = NeuralNetwork.create_network_architecture(*self.nn_arch)
-        temp_nn.load_weights(individuo)
-        size = getattr(estado, "size", None)
-        if size is None:
-            if hasattr(estado, "largura"):
-                size = max(1, estado.largura)
-            else:
-                size = 100.0
+                fig2, ax2 = plt.subplots(figsize=(10, 10))
+                if walls:
+                    for wall in walls:
+                        if isinstance(wall, tuple) and len(wall) >= 2:
+                            wx, wy = wall[0], wall[1]
+                        else:
+                            wx, wy = getattr(wall, "x", None), getattr(wall, "y", None)
+                        if wx is not None and wy is not None:
+                            ax2.add_patch(patches.Rectangle((wx - 0.5, wy - 0.5), 1, 1, facecolor='black'))
 
-        inputs = np.array([
-            estado.posicao[0] / float(size),
-            estado.posicao[1] / float(size),
-            getattr(estado, "goalx", 0) / float(size),
-            getattr(estado, "goaly", 0) / float(size)
-        ], dtype=np.float32)
+                if goalx is not None and goaly is not None:
+                    ax2.text(goalx, goaly, "G", color='green', fontsize=10, ha='center', va='center', fontweight='bold')
 
-        out = temp_nn.forward(inputs)
-        idx = int(np.argmax(out))
-        return index_to_action.get(idx, "cima")
+                cmap = plt.get_cmap("viridis")
+                if last_generation:
+                    colors2 = cmap(np.linspace(0, 1, len(last_generation)))
+                    for i, agent in enumerate(last_generation):
+                        if hasattr(agent, "path") and len(agent.path) > 1:
+                            xs = [p[0] for p in agent.path]
+                            ys = [p[1] for p in agent.path]
+                            ax2.plot(xs, ys, color=colors2[i], alpha=0.5)
+                            ax2.plot(xs[-1], ys[-1], 'x', color=colors2[i], markersize=6)
 
-    def salvar_melhor(self, path="best_weights.npy"):
-        if self.best_individuo is not None:
-            np.save(path, self.best_individuo)
+                if largura is not None and altura is not None:
+                    ax2.set_xlim(-1, largura + 1)
+                    ax2.set_ylim(-1, altura + 1)
+                else:
+                    ax2.set_xlim(-1, 100)
+                    ax2.set_ylim(-1, 100)
 
-    def carregar_melhor(self, path="best_weights.npy"):
-        w = np.load(path)
-        self.best_individuo = w
-        nn = NeuralNetwork.create_network_architecture(*self.nn_arch)
-        nn.load_weights(w)
-        self.best_neural_network = nn
-        self.treinada = True
+                ax2.set_title("Todos os Caminhos – Última Geração")
+                ax2.set_xlabel("X")
+                ax2.set_ylabel("Y")
+                ax2.grid(True)
+                plt.tight_layout()
+                plt.show()
+            except Exception as e:
+                print(f"[GA] Erro ao gerar gráficos: {e}")
+
+        return best_weights, best_nn
+
+

@@ -3,14 +3,14 @@ from matplotlib import patches
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-from AmbienteFarol import Wall, Farol
-from Agent import AgenteLearner
+from Recolecao.AmbienteRecolecao import AmbienteRecolecao
 import NeuralNetwork
+from Recolecao.AgentRecolecao import AgenteRecolecao
 
 
 class GeneticSimulation:
 
-    def crossover(self, parent1, parent2, farol):
+    def crossover(self, parent1, parent2, amb):
 
         """Performs one-point crossover between two parent agents."""
         point = random.randint(1, len(parent1.neural_network.weights) - 1)
@@ -18,13 +18,13 @@ class GeneticSimulation:
         child1_geno = np.concatenate([parent1.neural_network.weights[:point], parent2.neural_network.weights[point:]])
         child2_geno = np.concatenate([parent2.neural_network.weights[:point], parent1.neural_network.weights[point:]])
 
-        nn1 = NeuralNetwork.create_network_architecture(15, 4, (16,8 ))
-        nn2 = NeuralNetwork.create_network_architecture(15, 4, (16,8 ))
+        nn1 = NeuralNetwork.create_network_architecture(17, 4, (16,8 ))
+        nn2 = NeuralNetwork.create_network_architecture(17, 4, (16,8 ))
 
         nn1.load_weights(child1_geno)
         nn2.load_weights(child2_geno)
 
-        return AgenteLearner(farol, nn1), AgenteLearner(farol, nn2)
+        return AgenteRecolecao(amb, nn1), AgenteRecolecao(amb, nn2)
 
     def select_parent(self, population, tournament_size):
 
@@ -39,19 +39,19 @@ class GeneticSimulation:
         POPULATION_SIZE = 100
         NUM_GENERATIONS = 25
         MUTATION_RATE = 0.01
-        TOURNAMENT_SIZE = 3
+        TOURNAMENT_SIZE = 5
 
         # --- Initialization ---
         population = []
         last_generation = []
-        farol = Farol("Farol.txt")
+        amb = AmbienteRecolecao("Recolecao.txt")
 
         for _ in range(POPULATION_SIZE):
-            nn = NeuralNetwork.create_network_architecture(15, 4, (16, 8))
+            nn = NeuralNetwork.create_network_architecture(17, 4, (16, 8))
             num_weights = nn.compute_num_weights()
             weights = [random.uniform(-1, 1) for _ in range(num_weights)]
             nn.load_weights(weights)
-            agent = AgenteLearner(farol, nn)
+            agent = AgenteRecolecao(amb, nn)
 
             population.append(agent)
         avg_fitness_per_gen = []
@@ -62,28 +62,25 @@ class GeneticSimulation:
         # --- Generational Loop ---
         for gen in range(NUM_GENERATIONS):
 
+
             print(f"Generation {gen + 1}/{NUM_GENERATIONS}")
             total_fitness = 0
 
             # 1. Evaluate Population
+            for agent in population:
+                agent.setPosition(0,0)
+                agent.reset()
+                agent.setAmbiente(AmbienteRecolecao("Recolecao.txt"))
 
             for agent in population:
-                start_x, start_y = farol.random_valid_position()
-                agent.run_genetic_simulation(start_x=start_x, start_y=start_y)
+                agent.run_genetic_simulation()
                 total_fitness += agent.getFitness()
 
             # 2. Sort population by *fitness*
 
             population.sort(key=lambda x: x.fitness, reverse=True)
 
-            if population[0].foundGoal:
-                print(f"  Best agent found the goal!")
-            i = 0
-
-            for _ in range(POPULATION_SIZE):
-                if population[_].foundGoal:
-                    i += 1
-            print(f"  Agents that found the goal: {i}")
+            print(f"Best agent found: {population[0].delivered}")
 
             # 3. Log results for this generation
             avg_fitness = total_fitness / POPULATION_SIZE
@@ -102,16 +99,16 @@ class GeneticSimulation:
             n_elite = POPULATION_SIZE // 5
 
             for elite_agent in population[:n_elite]:
-                nn_copy = NeuralNetwork.create_network_architecture(15, 4, (16,8))
+                nn_copy = NeuralNetwork.create_network_architecture(17, 4, (16,8))
                 nn_copy.load_weights(elite_agent.neural_network.weights.copy())
-                new_agent = AgenteLearner(farol, nn_copy)  # Use MAIN farol
+                new_agent = AgenteRecolecao(amb, nn_copy)  # Use MAIN farol
                 new_population.append(new_agent)
 
             while len(new_population) < POPULATION_SIZE:
                 parent1 = self.select_parent(population, TOURNAMENT_SIZE)  # This now uses combined_fitness
                 parent2 = self.select_parent(population, TOURNAMENT_SIZE)
 
-                child1, child2 = self.crossover(parent1, parent2, farol)
+                child1, child2 = self.crossover(parent1, parent2, amb)
 
                 child1.mutate(MUTATION_RATE) if random.random() < 0.7 else None
                 child2.mutate(MUTATION_RATE) if random.random() < 0.7 else None
@@ -133,7 +130,7 @@ class GeneticSimulation:
             colors = cm.rainbow(np.linspace(0, 1, len(best_paths_per_gen)))
 
             # Plot walls and goal
-            for wall in farol.walls:
+            for wall in amb.walls:
                 ax.add_patch(
                     patches.Rectangle(
                         (wall.x - 0.5, wall.y - 0.5),  # lower-left corner
@@ -142,10 +139,19 @@ class GeneticSimulation:
                     )
                 )
 
-            ax.text(farol.goalx, farol.goaly, "G", color='green', fontsize=9, ha='center', va='center',
-                    fontweight='bold')
+            for resource in amb.resources:
+                ax.text(resource.x, resource.y, "R", color='green', fontsize=9, ha='center', va='center',
+                        fontweight='bold')
+
+            for delivery in amb.deliveryPoints:
+                ax.text(delivery.x, delivery.y, "P", color='red', fontsize=9, ha='center', va='center',
+                        fontweight='bold')
+
+            for agente in amb.agentes:
+                ax.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
+
             # Plot paths
-            plot_gens = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23, NUM_GENERATIONS - 1]
+            plot_gens = [0,5,10,15, NUM_GENERATIONS - 1]
             for i in plot_gens:
                 path = best_paths_per_gen[i]
                 avg_fitness = avg_fitness_per_gen[i]  # Get the avg combined fitness
@@ -155,8 +161,8 @@ class GeneticSimulation:
                         alpha=0.7)
                 ax.plot(x_vals[-1], y_vals[-1], 'x', color=colors[i], markersize=10, markeredgewidth=2)
 
-            ax.set_xlim(-1, 100)
-            ax.set_ylim(-1, 100)
+            ax.set_xlim(-1, 50)
+            ax.set_ylim(-1, 50)
             ax.set_title("Best Agent Paths Over Generations")
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
@@ -179,7 +185,7 @@ class GeneticSimulation:
             fig2, ax2 = plt.subplots(figsize=(10, 10))
 
             # Plot walls
-            for wall in farol.walls:
+            for wall in amb.walls:
                 ax2.add_patch(
                     patches.Rectangle(
                         (wall.x - 0.5, wall.y - 0.5),
@@ -188,12 +194,16 @@ class GeneticSimulation:
                     )
                 )
 
-            # Goal
-            ax2.text(
-                farol.goalx, farol.goaly, "G",
-                color='green', fontsize=10,
-                ha='center', va='center', fontweight='bold'
-            )
+            for resource in amb.resources:
+                ax2.text(resource.x, resource.y, "R", color='green', fontsize=9, ha='center', va='center',
+                        fontweight='bold')
+
+            for delivery in amb.deliveryPoints:
+                ax2.text(delivery.x, delivery.y, "P", color='red', fontsize=9, ha='center', va='center',
+                        fontweight='bold')
+
+            for agente in amb.agentes:
+                ax2.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
 
             # --- Use get_cmap() ---
             cmap = plt.get_cmap("viridis")  # You can choose ANY cmap here
@@ -220,8 +230,8 @@ class GeneticSimulation:
                         markersize=6
                     )
 
-            ax2.set_xlim(-1, 100)
-            ax2.set_ylim(-1, 100)
+            ax2.set_xlim(-1, 50)
+            ax2.set_ylim(-1, 50)
             ax2.set_title("All Agent Paths - Last Generation")
             ax2.set_xlabel("X")
             ax2.set_ylabel("Y")

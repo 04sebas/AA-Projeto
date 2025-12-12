@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List
 
-from Agentes.Agente import Agente
-from Objetos.Accao import Accao
-from Objetos.Observacao import Observacao
+from ProjetoAA.Agentes.Agente import Agente
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Objetos.Observacao import Observacao
 
 
 class Ambiente(ABC):
@@ -49,3 +48,5 @@ class Ambiente(ABC):
         if (x, y) in self.obstaculos:
             return False
         return True
+
+

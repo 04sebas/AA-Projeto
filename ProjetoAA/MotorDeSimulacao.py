@@ -1,79 +1,107 @@
 import json
-import seaborn as sns
 import numpy as np
+import sns
 from matplotlib import pyplot as plt
-from Ambientes.AmbienteForaging import AmbienteForaging
-from Agentes.AgenteAprendizagem import AgenteAprendizagem
-from Agentes.AgenteFixo import AgenteFixo
-from Ambientes.AmbienteFarol import AmbienteFarol
+from ProjetoAA.Agentes.AgenteAprendizagem import AgenteAprendizagem
+from ProjetoAA.Agentes.AgenteFixo import AgenteFixo
+from ProjetoAA.Ambientes.AmbienteFarol import AmbienteFarol
+from ProjetoAA.Aprendizagem.EstrategiaGenetica import EstrategiaGenetica
+from ProjetoAA.Aprendizagem.EstrategiaQLearning import EstrategiaDQN
+
+
+def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_dir="models"):
+    import os, pickle
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    env_name = getattr(ambiente, "nome", type(ambiente).__name__)
+    filename = f"{env_name}_agente{agent_index}_nn.pkl"
+    path = os.path.join(out_dir, filename)
+
+    meta = {
+        "env_name": env_name,
+        "agent_index": agent_index,
+        "nn_arch": nn_arch if nn_arch is not None else getattr(nn_obj, "arch", None),
+    }
+
+    data = {
+        "meta": meta,
+        "weights_flat": weights,
+        "hidden_weights": getattr(nn_obj, "hidden_weights", None),
+        "hidden_biases": getattr(nn_obj, "hidden_biases", None),
+        "output_weights": getattr(nn_obj, "output_weights", None),
+        "output_bias": getattr(nn_obj, "output_bias", None),
+    }
+
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
+
+    print(f"[SALVO] NN guardada em {path}")
+    return path, meta
 
 class MotorDeSimulacao:
     def __init__(self):
+        self._ficheiro_config = None
         self.recursos_iniciais = None
         self.ambiente = None
         self.passos = 0
         self.agentes = []
-        self.order = []
+        self.ordem = []
         self.ativo = False
-        self.max_passos = 100
+        self.max_passos = 1000
         self.visualizacao = True
         self.historico_agentes = {}
-        self.historico_recompensa = {agente: [0] for agente in self.agentes}
+        self.historico_recompensa = {}
+        self.config_estrategias = []
 
     def lista_agentes(self):
         return self.agentes
 
-    def cria(self, nome_do_ficheiro_parametros: str) -> "MotorDeSimulacao":
+    def cria(self, nome_do_ficheiro_parametros):
         try:
             with open(nome_do_ficheiro_parametros, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             self._cria_ambiente(config.get("ambiente", {}))
+            self.config_estrategias = config.get("estrategia", [])
             self._cria_agentes(config.get("agentes", []))
-            simulador_config = config.get("simulador", {})
-            self.max_passos = simulador_config.get("max_passos", 100)
-            self.visualizacao = simulador_config.get("visualizacao", True)
+            config_simulador = config.get("simulador", {})
+            self.max_passos = config_simulador.get("max_passos", 100)
+            self.visualizacao = config_simulador.get("visualizacao", True)
             self.ativo = True
+            self._ficheiro_config = nome_do_ficheiro_parametros
             print(f"Simulação criada com sucesso: {len(self.agentes)} agentes no ambiente")
         except FileNotFoundError:
             print(f"Erro: Ficheiro {nome_do_ficheiro_parametros} não encontrado.")
         except json.JSONDecodeError:
             print(f"Erro: Ficheiro JSON inválido: {nome_do_ficheiro_parametros}")
         except Exception as e:
-            print(f"Erro a criar simulação. {e}")
+            print(f"Erro a criar simulação: {e}")
         return self
 
-    def _cria_ambiente(self, config_ambiente: dict):
+    def _cria_ambiente(self, config_ambiente):
         tipo_ambiente = config_ambiente.get("tipo", "AmbienteFarol")
         if tipo_ambiente == "AmbienteFarol":
             self.ambiente = AmbienteFarol(
-                largura=config_ambiente.get("largura", 10),
-                altura=config_ambiente.get("altura", 10),
-                pos_farol=tuple(config_ambiente.get("pos_farol", [5, 5])),
+                largura=config_ambiente.get("largura", 100),
+                altura=config_ambiente.get("altura", 100),
+                pos_farol=tuple(config_ambiente.get("pos_farol", [50,75])),
                 obstaculos=config_ambiente.get("obstaculos", [])
             )
-        elif tipo_ambiente == "AmbienteForaging":
-            if AmbienteForaging is None:
-                raise ImportError("AmbienteForaging não está disponível — certifica-te que o ficheiro existe e o import funciona.")
-            recursos = config_ambiente.get("recursos", [])
-            ninhos = [tuple(n) for n in config_ambiente.get("ninhos", [])]
-            obstaculos = config_ambiente.get("obstaculos", [])
-            self.ambiente = AmbienteForaging(
-                largura=config_ambiente.get("largura", 30),
-                altura=config_ambiente.get("altura", 30),
-                recursos=recursos,
-                ninhos=ninhos,
-                obstaculos=obstaculos
-            )
         else:
-            raise ValueError(f"Tipo de ambiente não suportado: {tipo_ambiente}")
+            self.ambiente = AmbienteFarol()
+
+    def _obter_config_estrategia(self, tipo_estrategia):
+        for e in self.config_estrategias:
+            if e.get("tipo") == tipo_estrategia:
+                return e
+        return {}
 
     def _cria_agentes(self, config_agentes):
         for config in config_agentes:
             tipo = config.get("tipo")
             quantidade = config.get("quantidade", 1)
             posicoes = config.get("posicao_inicial", "random")
-            tipo_estrategia = config.get("tipo_estrategia")
-            sensores = config.get("sensores", 1)
+            trainable = config.get("trainable", True)
 
             for i in range(quantidade):
                 if posicoes == "random":
@@ -83,52 +111,174 @@ class MotorDeSimulacao:
                         pos = posicoes[i]
                     else:
                         pos = posicoes
-
                 if isinstance(pos, list):
                     pos = tuple(pos)
-
                 if tipo == "AgenteFixo":
-                    agente = AgenteFixo(posicao=list(pos), politica=config.get("politica"))
+                    agente = AgenteFixo(posicao=list(pos), politica=config.get("politica", {}))
                 elif tipo == "AgenteAprendizagem":
-                    agente_prototipo = AgenteAprendizagem(tipo_estrategia=tipo_estrategia, sensores=sensores)
-                    agente = agente_prototipo.cria(config.get("ficheiro_parametros", "simulacao_farol.json"))
+                    tipo_estrategia = config.get("tipo_estrategia", config.get("estrategia", {}).get("nome", "qlearning"))
+                    agente = AgenteAprendizagem(nome=f"Aprendiz_{i}")
+                    agente.tipo_estrategia = tipo_estrategia
+                    agente.estrategia_conf = config.get("estrategia", config.get("estrategia_conf", {}))
                 else:
                     raise ValueError(f"Tipo de agente desconhecido: {tipo}")
 
+                agente.trainable = bool(trainable)
                 agente.pos = list(pos)
-                self.ambiente.posicoes[agente] = tuple(pos)
-
                 self.agentes.append(agente)
+                print(f"Criado agente {agente.nome} na posição {pos}")
+
+    def carregar_rede(self, filepath, agente_idx):
+        import pickle, os
+        from ProjetoAA.Aprendizagem.RedeNeuronal import RedeNeuronal, relu, output_fn
+
+        base = os.path.dirname(__file__)
+        fullpath = os.path.join(base, filepath)
+
+        if not os.path.exists(fullpath):
+            raise FileNotFoundError(f"Não encontrado: {fullpath}")
+
+        with open(fullpath, "rb") as f:
+            data = pickle.load(f)
+
+        meta = data["meta"]
+        nn_arch = meta["nn_arch"]
+
+        input_size, output_size, hidden_arch = nn_arch
+
+        nn = RedeNeuronal(input_size, output_size, hidden_arch, relu, output_fn)
+
+        nn.hidden_weights = data.get("hidden_weights")
+        nn.hidden_biases = data.get("hidden_biases")
+        nn.output_weights = data.get("output_weights")
+        nn.output_bias = data.get("output_bias")
+
+        self.agentes[agente_idx].neural_network = nn
+        self.agentes[agente_idx].weights = data.get("weights_flat")
+
+        print(f"[LOAD] NN carregada para o agente {agente_idx}")
 
     def fase_treino(self):
-        for agente in self.agentes:
-            if isinstance(agente, AgenteAprendizagem):
-                if agente.tipo_estrategia == "genetica":
-                    agente.estrategia.run(self.ambiente)
+        saved_files = {}
+
+        for idx, agente in enumerate(self.agentes):
+            if not getattr(agente, "trainable", False):
+                continue
+
+            tipo = getattr(agente, "tipo_estrategia", None)
+            conf = getattr(agente, "estrategia_conf", None)
+            if conf is None:
+                conf = self._obter_config_estrategia(tipo or "genetica")
+
+            input_size = (2 * agente.sensores.alcance + 1) ** 2 - 1 + 3
+
+            if tipo == "genetica":
+                ga = EstrategiaGenetica(
+                    populacao_tamanho=conf.get("populacao_tamanho", 100),
+                    taxa_mutacao=conf.get("taxa_mutacao", 0.01),
+                    num_geracoes=conf.get("num_ger", 25),
+                    tamanho_torneio=conf.get("tamanho_torneio", 3),
+                    elitismo_frac=conf.get("elitismo_frac", 0.2),
+                    nn_arch=(input_size, 4, conf.get("hidden", (16, 8))),
+                    passos_por_avaliacao=conf.get("passos_por_avaliacao", 1000),
+                    mutation_std=conf.get("mutation_std", 0.1),
+                )
+
+                self.ambiente.posicoes = {}
+
+                best_weights, best_nn = ga.run(self.ambiente, verbose=True)
+
+                self.ambiente.reset()
+
+                agente.neural_network = best_nn
+                agente.weights = np.array(best_weights).copy()
+
+                path, meta = _salvar_melhor_nn(
+                    self.ambiente,
+                    idx,
+                    best_weights,
+                    best_nn,
+                    nn_arch=getattr(ga, "nn_arch", None)
+                )
+                meta = dict(meta or {})
+                meta["tipo"] = "genetica"
+                saved_files[idx] = {"path": path, "meta": meta}
+                print(f"[fase_treino] Agente {idx}: rede genetica aplicada e salva em {path}")
+
+            elif tipo == "dqn":
+                dqn_conf = conf or {}
+                dqn = EstrategiaDQN(
+                    nn_arch=(input_size, 4, dqn_conf.get("hidden", (16, 8))),
+                    episodes=dqn_conf.get("episodes", 100),
+                    passos_por_ep=dqn_conf.get("passos_por_ep", 1000),
+                    gamma=dqn_conf.get("gamma", 0.99),
+                    epsilon=dqn_conf.get("epsilon", 0.5),
+                    epsilon_min=dqn_conf.get("epsilon_min", 0.1),
+                    epsilon_decay=dqn_conf.get("epsilon_decay", 0.995),
+                    batch_size=dqn_conf.get("batch_size", 32),
+                    target_update_freq=dqn_conf.get("target_update_freq", 50),
+                    memory_size=dqn_conf.get("memory_size", 50000),
+                    learning_rate=dqn_conf.get("learning_rate", 0.001),
+                )
+
+                self.ambiente.posicoes = {}
+
+                best_weights, best_nn = dqn.run(self.ambiente, verbose=True)
+
+                self.ambiente.reset()
+
+                agente.neural_network = best_nn
+                agente.weights = np.array(best_weights).copy()
+
+                path, meta = _salvar_melhor_nn(
+                    self.ambiente,
+                    idx,
+                    best_weights,
+                    best_nn,
+                    nn_arch=getattr(dqn, "nn_arch", None)
+                )
+                meta = dict(meta or {})
+                meta["tipo"] = "dqn"
+                saved_files[idx] = {"path": path, "meta": meta}
+                print(f"[fase_treino] Agente {idx}: rede dqn aplicada e salva em {path}")
+
+            else:
+                continue
+
+        return saved_files
 
     def fase_teste(self):
         self.executa(self.max_passos)
 
-    def executa(self, max_passos: int = None):
+    def executa(self, max_passos=None):
         if not self.ativo:
             print("Simulação não foi criada corretamente.")
             return
+
         max_p = max_passos if max_passos is not None else self.max_passos
+        self.ambiente.posicoes = {}
+
+        for agente in self.agentes:
+            if not hasattr(agente, "pos") or agente.pos is None:
+                pos = self.ambiente.posicao_aleatoria()
+                agente.pos = list(pos)
+            self.ambiente.posicoes[agente] = tuple(agente.pos)
+
+        self.historico_agentes = {}
+        self.historico_recompensa = {}
+
         for agente in self.agentes:
             self.historico_agentes[agente] = [list(agente.pos)]
-            self.historico_recompensa[agente] = [0]
-
+            nome = getattr(agente, "nome", f"Agente_{self.agentes.index(agente)}")
+            self.historico_recompensa[nome] = [0]
         self.recursos_iniciais = {}
+
         if isinstance(self.ambiente.recursos, dict):
             for pos, info in self.ambiente.recursos.items():
-                self.recursos_iniciais[pos] = {
-                    "valor": info["valor"],
-                    "quantidade": info["quantidade"]
-                }
+                self.recursos_iniciais[pos] = {"valor": info["valor"], "quantidade": info["quantidade"]}
 
         for passo in range(max_p):
             todos_terminaram = False
-
             for agente in self.agentes:
                 observacao = self.ambiente.observacao_para(agente)
                 agente.observacao(observacao)
@@ -139,27 +289,19 @@ class MotorDeSimulacao:
                 if isinstance(agente.pos, tuple):
                     agente.pos = list(agente.pos)
                 self.historico_agentes[agente].append(list(agente.pos))
-                ultimo_valor = self.historico_recompensa[agente][-1]
-                self.historico_recompensa[agente].append(ultimo_valor + recompensa)
+                nome = getattr(agente, "nome", f"Agente_{self.agentes.index(agente)}")
+                self.historico_recompensa[nome].append(recompensa)
 
-            self.ambiente.atualizacao()
+            if hasattr(self.ambiente, "atualizacao"):
+                self.ambiente.atualizacao()
             self.passos += 1
 
             if isinstance(self.ambiente, AmbienteFarol):
-                todos_terminaram = all(
-                    tuple(agente.pos) == self.ambiente.pos_farol for agente in self.agentes
-                )
-            elif isinstance(self.ambiente, AmbienteForaging):
-                todos_terminaram = len(self.ambiente.recursos) == 0 and all(
-                    self.ambiente.cargas.get(agente, 0) == 0 for agente in self.agentes
-                )
+                todos_terminaram = all(tuple(ag.pos) == self.ambiente.pos_farol for ag in self.agentes)
 
             if todos_terminaram:
                 print(f"Simulação terminada no passo {passo}!")
                 break
-
-            self.ambiente.atualizacao()
-            self.passos += 1
 
         if self.visualizacao:
             try:
@@ -167,79 +309,20 @@ class MotorDeSimulacao:
             except Exception as e:
                 print(f"Erro ao desenhar visualizações: {e}")
 
-    def visualizar_heatmap(self):
-        altura = self.ambiente.altura
-        largura = self.ambiente.largura
-        heatmap = np.zeros((altura, largura))
-        for path in self.historico_agentes.values():
-            for (x, y) in path:
-                if 0 <= x < largura and 0 <= y < altura:
-                    heatmap[y][x] += 1
-        plt.figure(figsize=(8, 8))
-        ax = sns.heatmap(heatmap, cmap="YlGnBu", cbar=True)
-        if hasattr(self.ambiente, "pos_farol"):
-            farol_x, farol_y = self.ambiente.pos_farol
-            plt.text(farol_x + 0.5, farol_y + 0.5, "Farol", color='red', fontsize=10, ha='center', va='center', fontweight='bold')
-
-        recursos = getattr(self.ambiente, "recursos", None)
-        if recursos:
-            if isinstance(recursos, dict):
-                itens = recursos.items()
-            else:
-                itens = []
-                for r in recursos:
-                    pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
-                    if pos is not None:
-                        itens.append((pos, r))
-            for pos, info in itens:
-                x, y = pos
-                qtd = info.get("quantidade", info.get("qtd", 1))
-                ax.scatter([x + 0.5], [y + 0.5], marker='o', s=50 + qtd * 10)
-                ax.text(x + 0.5, y + 0.5, str(info.get("valor", qtd)), color='black', fontsize=8, ha='center', va='center')
-
-        ninhos = getattr(self.ambiente, "ninhos", None)
-        if ninhos:
-            for n in ninhos:
-                x, y = n
-                ax.scatter([x + 0.5], [y + 0.5], marker='s', s=120, facecolors='none', edgecolors='magenta', linewidths=2)
-                ax.text(x + 0.5, y + 0.5, "Ninho", color='magenta', fontsize=8, ha='center', va='center')
-
-        obs_raw = getattr(self.ambiente, "obstaculos_raw", None)
-        if obs_raw:
-            obs_x = [p["pos"][0] + 0.5 for p in obs_raw]
-            obs_y = [p["pos"][1] + 0.5 for p in obs_raw]
-            ax.scatter(obs_x, obs_y, color="black", marker="s", s=80)
-        else:
-            obs_set = getattr(self.ambiente, "obstaculos", None)
-            if obs_set:
-                obs_x = [p[0] + 0.5 for p in obs_set]
-                obs_y = [p[1] + 0.5 for p in obs_set]
-                ax.scatter(obs_x, obs_y, color="black", marker="s", s=80)
-
-        ax.invert_yaxis()
-        plt.title("Heatmap das Posições Visitadas pelos Agentes")
-        plt.xlabel("X")
-        plt.ylabel("Y")
-        plt.show()
-
     def visualizar_caminhos(self):
         altura = self.ambiente.altura
         largura = self.ambiente.largura
-        plt.figure(figsize=(8, 8))
-
-        cores = plt.cm.tab20(np.linspace(0, 1, max(1, len(self.historico_agentes))))
-
-        for i, (agente, path) in enumerate(self.historico_agentes.items()):
-            xs = [p[0] for p in path]
-            ys = [p[1] for p in path]
+        plt.figure(figsize=(8,8))
+        cores = plt.cm.tab20(np.linspace(0,1,max(1,len(self.historico_agentes))))
+        for i, (agente, caminho) in enumerate(self.historico_agentes.items()):
+            xs = [p[0] for p in caminho]
+            ys = [p[1] for p in caminho]
             plt.plot(xs, ys, marker='.', linewidth=1, color=cores[i], label=f"Agente {i}")
             plt.scatter(xs[0], ys[0], c=[cores[i]], marker='o', s=80)
             plt.scatter(xs[-1], ys[-1], c=[cores[i]], marker='x', s=80)
-
         if hasattr(self.ambiente, "pos_farol"):
             farol_x, farol_y = self.ambiente.pos_farol
             plt.scatter([farol_x], [farol_y], color="red", marker="*", s=300, label="Farol")
-
         recursos = getattr(self.ambiente, "recursos", None)
         if recursos:
             if isinstance(recursos, dict):
@@ -247,21 +330,13 @@ class MotorDeSimulacao:
             else:
                 itens = []
                 for r in recursos:
-                    pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
+                    pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list,tuple)) else None
                     if pos is not None:
                         itens.append((pos, r))
             for pos, info in itens:
                 x, y = pos
                 plt.scatter([x], [y], s=80, marker='o', label="_nolegend_", alpha=0.7)
-                plt.text(x + 0.1, y + 0.1, str(info.get("valor", info.get("quantidade", 1))), fontsize=8)
-
-        ninhos = getattr(self.ambiente, "ninhos", None)
-        if ninhos:
-            for n in ninhos:
-                x, y = n
-                plt.scatter([x], [y], marker='s', s=140, facecolors='none', edgecolors='magenta', linewidths=2)
-                plt.text(x + 0.1, y + 0.1, "Ninho", color='magenta', fontsize=8)
-
+                plt.text(x + 0.1, y + 0.1, str(info.get("valor", info.get("quantidade",1))), fontsize=8)
         obs_raw = getattr(self.ambiente, "obstaculos_raw", None)
         if obs_raw:
             obs_x = [p["pos"][0] for p in obs_raw]
@@ -278,28 +353,20 @@ class MotorDeSimulacao:
         if hasattr(self, "recursos_iniciais"):
             for pos, info in self.recursos_iniciais.items():
                 x, y = pos
-
                 atual = self.ambiente.recursos.get(pos, {}).get("quantidade", 0)
-
                 cor = "blue" if atual > 0 else "gray"
-
                 plt.scatter([x], [y], s=80, marker='o', color=cor)
-                plt.text(x + 0.1, y + 0.1,
-                         f"ini:{info['quantidade']}\nact:{atual}",
-                         fontsize=7)
-
+                plt.text(x + 0.1, y + 0.1, f"ini:{info['quantidade']}\nact:{atual}", fontsize=7)
         ax = plt.gca()
         ax.set_xlim(-0.5, largura - 0.5)
         ax.set_ylim(-0.5, altura - 0.5)
         ax.set_aspect('equal', adjustable='box')
-
         xticks = np.arange(0, largura, max(1, largura // 10))
         yticks = np.arange(0, altura, max(1, altura // 10))
         ax.set_xticks(xticks)
         ax.set_yticks(yticks)
         ax.set_xticklabels(xticks)
         ax.set_yticklabels(yticks)
-
         plt.xlabel("X")
         plt.ylabel("Y")
         plt.title("Trajetórias dos Agentes no Ambiente")
@@ -307,46 +374,20 @@ class MotorDeSimulacao:
         plt.grid(True)
         plt.show()
 
-    def visualizar_recursos_agentes(self):
-        agentes = self.agentes
-        nomes = [f"Agente {i}" for i in range(len(agentes))]
-        recolhidos = [getattr(a, "recursos_recolhidos", 0) for a in agentes]
-        depositados = [getattr(a, "recursos_depositados", 0) for a in agentes]
-
-        x = np.arange(len(agentes))
-        largura = 0.35
-
-        plt.figure(figsize=(10, 6))
-        plt.bar(x - largura / 2, recolhidos, largura, label='Recolhidos', color='skyblue')
-        plt.bar(x + largura / 2, depositados, largura, label='Depositados', color='lightgreen')
-
-        plt.xlabel("Agentes")
-        plt.ylabel("Quantidade de Recursos")
-        plt.title("Recursos Recolhidos e Depositados por Agente")
-        plt.xticks(x, nomes)
-        plt.legend()
-        plt.grid(axis='y')
-        plt.show()
-
-    def visualizar_recompensa_agentes(self):
-        plt.figure(figsize=(10, 6))
-        cores = plt.cm.tab20(np.linspace(0, 1, len(self.agentes)))
-        for i, agente in enumerate(self.agentes):
-            plt.plot(self.historico_recompensa[agente], label=f"Agente {i}", color=cores[i])
-        plt.xlabel("Passos")
-        plt.ylabel("Recompensa Acumulada")
-        plt.title("Evolução da Recompensa Acumulada por Agente")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
-
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulacao_foraging.json")
+    simulador = MotorDeSimulacao().cria("simulacao_farol.json")
     if simulador.ativo:
+        """""
+        for idx, agente in enumerate(simulador.agentes):
+            if not isinstance(agente, AgenteAprendizagem):
+                continue
+            if not getattr(agente, "trainable", False):
+                continue
+
+            try:
+                simulador.carregar_rede(f"models/AmbienteFarol_agente{idx}_nn.pkl",idx)
+            except FileNotFoundError:
+                print(f"[LOAD] NN não encontrada para agente {idx}, será usado aleatório.")
+                """""
         simulador.fase_treino()
         simulador.fase_teste()
-        simulador.visualizar_recursos_agentes()
-        simulador.visualizar_recompensa_agentes()
-
-
