@@ -51,8 +51,7 @@ class Ambiente(ABC):
         return True
 
     def posicao_aleatoria(self):
-        cols = 3
-        rows = 3
+        cols, rows = 3, 3
         passo_x = self.largura // (cols + 1)
         passo_y = self.altura // (rows + 1)
         posicoes = []
@@ -69,12 +68,16 @@ class Ambiente(ABC):
                 posicoes.append(pos)
 
         if not posicoes:
+            tentativa = 0
             while True:
                 x = random.randint(0, self.largura - 1)
                 y = random.randint(0, self.altura - 1)
                 pos = (x, y)
                 if pos not in self.obstaculos and pos not in self.recursos:
                     return pos
+                tentativa += 1
+                if tentativa > 1000:
+                    raise RuntimeError("Não foi possível encontrar uma posição livre.")
 
         return random.choice(posicoes)
 

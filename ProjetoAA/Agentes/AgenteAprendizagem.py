@@ -137,6 +137,7 @@ class AgenteAprendizagem(Agente):
 
         goal = getattr(obs, "goal", None)
         gx, gy = goal if goal else (None, None)
+        dist_current = math.sqrt((px - gx) ** 2 + (py - gy) ** 2)
 
         for dy in range(-alcance, alcance + 1):
             for dx in range(-alcance, alcance + 1):
@@ -151,10 +152,10 @@ class AgenteAprendizagem(Agente):
                     if tipo == "obstaculo":
                         features.append(-0.9)
                     elif tipo in ("recurso", "farol"):
-                        if getattr(obs, "foraging", False) and not getattr(obs, "carga", 0) > 0:
-                            features.append(1.0)
-                        else:
+                        if getattr(obs, "carga", 0) <= 0:
                             features.append(0.9)
+                        else:
+                            features.append(0.1)
                     elif tipo == "ninho":
                         if getattr(obs, "carga", 0) > 0:
                             features.append(1.0)
@@ -164,9 +165,11 @@ class AgenteAprendizagem(Agente):
                         features.append(-0.1)
                 else:
                     if gx is not None and gy is not None:
-                        dx_goal = (gx - pos_check[0]) / max(1, obs.largura - 1)
-                        dy_goal = (gy - pos_check[1]) / max(1, obs.altura - 1)
-                        features.append((dx_goal + dy_goal) / 2.0)
+                        dist_cell = math.sqrt((pos_check[0] - gx) ** 2 + (pos_check[1] - gy) ** 2)
+                        if dist_cell < dist_current:
+                            features.append(0.5)
+                        else:
+                            features.append(-0.1)
                     else:
                         features.append(-0.9)
 
@@ -219,7 +222,6 @@ class AgenteAprendizagem(Agente):
                 return "baixo"
 
         return "ficar"
-
 
 
 

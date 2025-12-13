@@ -48,12 +48,16 @@ class AmbienteFarol(Ambiente):
         pos = list(self.posicoes.get(agente, (0, 0)))
         x, y = pos
 
-        if accao.nome == "recolher" or (x, y) == self.pos_farol:
+        if (x, y) == self.pos_farol:
             recurso = self.recursos.get((x, y))
             if recurso is not None:
                 valor = recurso.get("valor", 1500)
                 agente.found_goal = True
-                return valor
+                return float(valor)
+            else:
+                return -0.1
+
+        if accao.nome == "recolher":
             return -0.1
         elif accao.nome == "cima":
             dx, dy = (0, 1)
@@ -68,8 +72,6 @@ class AmbienteFarol(Ambiente):
 
         newx, newy = x + dx, y + dy
 
-
-
         if not (0 <= newx < self.largura and 0 <= newy < self.altura):
             return -1
 
@@ -83,7 +85,10 @@ class AmbienteFarol(Ambiente):
 
         new_dist = self.distance_to_goal(newx, newy)
 
-        reward = -0.05
+        reward = -0.1
+        if (newx, newy) == (x, y):
+            reward -= 0.2
+
         if new_dist < prev_dist:
             reward += 1.0
 

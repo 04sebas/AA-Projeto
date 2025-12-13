@@ -1,101 +1,128 @@
 {
-    "simulador": {
-        "max_passos": 1000,
-        "visualizacao": true
-    },
-    "ambiente": {
-        "tipo": "AmbienteForaging",
-        "largura": 100,
-        "altura": 100,
-        "recursos": [
-            {
-                "pos": [
-                    10,
-                    10
-                ],
-                "quantidade": 5,
-                "valor": 10
-            },
-            {
-                "pos": [
-                    80,
-                    10
-                ],
-                "quantidade": 8,
-                "valor": 20
-            },
-            {
-                "pos": [
-                    20,
-                    40
-                ],
-                "quantidade": 15,
-                "valor": 5
-            },
-            {
-                "pos": [
-                    50,
-                    50
-                ],
-                "quantidade": 10,
-                "valor": 15
-            },
-            {
-                "pos": [
-                    75,
-                    75
-                ],
-                "quantidade": 20,
-                "valor": 25
-            },
-            {
-                "pos": [
-                    10,
-                    80
-                ],
-                "quantidade": 10,
-                "valor": 10
-            },
-            {
-                "pos": [
-                    90,
-                    90
-                ],
-                "quantidade": 5,
-                "valor": 30
-            }
-        ],
-        "ninhos": [
-            [
-                5,
-                5
-            ],
-            [
-                95,
-                95
-            ]
-        ],
-        "obstaculos": []
-    },
-    "agentes": [
-        {
-            "tipo": "AgenteFixo",
-            "quantidade": 0,
-            "posicao_inicial": "random",
-            "politica": {
-                "tipo": "greedy",
-                "alcance": 5,
-                "stuck_threshold": 3
-            }
-        },
-        {
-            "tipo": "AgenteAprendizagem",
-            "quantidade": 1,
-            "posicao_inicial": [[0,0]],
-            "tipo_estrategia": "genetica",
-            "sensores": 3,
-            "trainable": true,
-            "nome_base": "Genetico"
-        }
+  "simulador": {
+    "max_passos": 1000,
+    "visualizacao": true
+  },
+
+  "ambiente": {
+    "tipo": "AmbienteForaging",
+    "largura": 50,
+    "altura": 50,
+    "recursos": [
+      { "pos": [10, 10], "quantidade": 5,  "valor": 2 },
+      { "pos": [20, 15], "quantidade": 3,  "valor": 5 },
+      { "pos": [35, 40], "quantidade": 8,  "valor": 1 }
+    ],
+    "ninhos": [
+      [2, 2],
+      [47, 47]
+    ],
+    "obstaculos": [
+      [15, 15],
+      [16, 15],
+      [17, 15],
+      [30, 25],
+      [30, 26]
     ]
+  },
+
+  "agentes": [
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 1,
+      "posicao_inicial": [5, 5],
+      "trainable": false,
+      "politica": {
+        "tipo": "greedy",
+        "alcance": 6
+      }
+    },
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 0,
+      "posicao_inicial": "random",
+      "trainable": false,
+      "politica": {
+        "tipo": "random",
+        "alcance": 3
+      }
+    },
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 1,
+      "posicao_inicial": "random",
+      "trainable": true,
+      "tipo_estrategia": "genetica",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia": {
+        "nome": "genetica"
+      },
+      "estrategia_conf": {
+        "populacao_tamanho": 60,
+        "taxa_mutacao": 0.02,
+        "num_ger": 30,
+        "tamanho_torneio": 3,
+        "elitismo_frac": 0.1,
+        "hidden": [32, 16],
+        "passos_por_avaliacao": 500,
+        "mutation_std": 0.05
+      }
+    },
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 1,
+      "posicao_inicial": "random",
+      "trainable": true,
+      "tipo_estrategia": "dqn",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia": {
+        "nome": "dqn"
+      },
+      "estrategia_conf": {
+        "hidden": [32, 16],
+        "episodes": 200,
+        "passos_por_ep": 500,
+        "gamma": 0.99,
+        "epsilon": 1.0,
+        "epsilon_min": 0.1,
+        "epsilon_decay": 0.995,
+        "batch_size": 64,
+        "target_update_freq": 50,
+        "memory_size": 20000,
+        "learning_rate": 0.0005
+      }
+    }
+  ],
+
+  "estrategia": [
+    {
+      "tipo": "genetica",
+      "populacao_tamanho": 60,
+      "taxa_mutacao": 0.02,
+      "num_ger": 30,
+      "tamanho_torneio": 3,
+      "elitismo_frac": 0.1,
+      "hidden": [32, 16],
+      "passos_por_avaliacao": 800,
+      "mutation_std": 0.05
+    },
+    {
+      "tipo": "dqn",
+      "hidden": [32, 16],
+      "episodes": 200,
+      "passos_por_ep": 500,
+      "gamma": 0.99,
+      "epsilon": 1.0,
+      "epsilon_min": 0.1,
+      "epsilon_decay": 0.995,
+      "batch_size": 64,
+      "target_update_freq": 50,
+      "memory_size": 20000,
+      "learning_rate": 0.0005
+    }
+  ]
 }

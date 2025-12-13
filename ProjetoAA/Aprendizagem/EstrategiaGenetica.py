@@ -92,6 +92,7 @@ class EstrategiaGenetica:
             per_generation_agents = []
 
             for i, weights in enumerate(self.populacao):
+                ambiente.reset()
                 nn = create_network_architecture(*self.nn_arch)
                 nn.load_weights(weights)
 
@@ -102,6 +103,8 @@ class EstrategiaGenetica:
                 agent.path = []
                 agent.found_goal = False
                 agent.recompensa_total = 0.0
+                agent.recursos_recolhidos = 0
+                agent.recursos_depositados = 0
 
                 if isinstance(ambiente, AmbienteFarol):
                     start = ambiente.posicao_aleatoria_treino()
@@ -116,18 +119,9 @@ class EstrategiaGenetica:
                 for step in range(self.passos_por_avaliacao):
                     obs = ambiente.observacao_para(agent)
                     agent.observacao(obs)
-
                     acc = agent.age()
 
-                    try:
-                        reward = ambiente.agir(acc, agent)
-                        if reward is None:
-                            reward = 0.0
-                    except Exception as e:
-                        if verbose:
-                            print(f"[GA] Erro ao executar agir (ind={i}): {e}")
-                        reward = -1.0
-
+                    reward = ambiente.agir(acc, agent) or None
                     fitness += float(reward)
                     agent.path.append(agent.pos)
 
@@ -145,11 +139,7 @@ class EstrategiaGenetica:
             best_fit = float(self.fitness[0])
             avg_fit = float(np.mean(self.fitness))
             avg_fitness_per_gen.append(avg_fit)
-
-            best_agent = per_generation_agents[0]
-            best_paths_per_gen.append(best_agent.path)
-
-            last_generation = per_generation_agents  # agentes ordenados da última avaliação
+            last_generation = per_generation_agents
 
             if verbose:
                 print(f"[GA] Gen {gen + 1}: best={best_fit:.2f}, avg={avg_fit:.2f}")
@@ -188,30 +178,59 @@ class EstrategiaGenetica:
                 import matplotlib.pyplot as plt
                 import matplotlib.patches as patches
                 import matplotlib.cm as cm
+                import numpy as _np
+
+                larg = getattr(ambiente, "largura", 50)
+                alt = getattr(ambiente, "altura", 50)
+
+                recursos_raw = getattr(ambiente, "recursos", {})
+                ninhos_raw = getattr(ambiente, "ninhos", [])
+                obstaculos_raw = getattr(ambiente, "obstaculos", [])
+
+                recursos_list = []
+                if isinstance(recursos_raw, dict):
+                    for pos, info in recursos_raw.items():
+                        recursos_list.append((tuple(pos), dict(info)))
+                elif isinstance(recursos_raw, (list, tuple)):
+                    for r in recursos_raw:
+                        if isinstance(r, dict) and "pos" in r:
+                            recursos_list.append(
+                                (tuple(r["pos"]), {"quantidade": r.get("quantidade", 1), "valor": r.get("valor", 0)}))
+                else:
+                    recursos_list = []
+
+                ninhos_list = []
+                if isinstance(ninhos_raw, (list, tuple, set)):
+                    for n in ninhos_raw:
+                        try:
+                            ninhos_list.append(tuple(n))
+                        except:
+                            pass
+
+                obstaculos_list = []
+                if isinstance(obstaculos_raw, (list, tuple, set)):
+                    for o in obstaculos_raw:
+                        if isinstance(o, tuple) and len(o) >= 2:
+                            obstaculos_list.append(tuple(o))
+                        elif isinstance(o, list) and len(o) >= 2:
+                            obstaculos_list.append(tuple(o))
+                        elif isinstance(o, dict) and "pos" in o:
+                            obstaculos_list.append(tuple(o["pos"]))
+
                 fig, ax = plt.subplots(figsize=(10, 10))
 
-                walls = getattr(ambiente, "paredes", None) or getattr(ambiente, "walls", None)
-                if walls:
-                    for wall in walls:
-                        if isinstance(wall, tuple) and len(wall) >= 2:
-                            wx, wy = wall[0], wall[1]
-                        else:
-                            wx, wy = getattr(wall, "x", None), getattr(wall, "y", None)
-                        if wx is not None and wy is not None:
-                            ax.add_patch(patches.Rectangle((wx - 0.5, wy - 0.5), 1, 1, facecolor='black'))
+                for (rx, ry), info in recursos_list:
+                    ax.add_patch(
+                        patches.Circle((rx, ry), radius=0.4, facecolor="gold", alpha=0.6, edgecolor='k', linewidth=0.3))
+                    q = info.get("quantidade", "")
+                    ax.text(rx, ry, f"{q}", color="black", ha="center", va="center", fontsize=7)
 
-                goalx = getattr(ambiente, "goalx", None)
-                goaly = getattr(ambiente, "goaly", None)
-                if goalx is None or goaly is None:
-                    goal_pos = getattr(ambiente, "goal_pos", None) or getattr(ambiente, "pos_farol", None) or getattr(
-                        ambiente, "goal", None)
-                    if isinstance(goal_pos, tuple) and len(goal_pos) >= 2:
-                        goalx, goaly = goal_pos[0], goal_pos[1]
-                    elif hasattr(goal_pos, "x") and hasattr(goal_pos, "y"):
-                        goalx, goaly = goal_pos.x, goal_pos.y
+                for nx, ny in ninhos_list:
+                    ax.add_patch(patches.Circle((nx, ny), radius=0.5, facecolor="blue", edgecolor='k'))
+                    ax.text(nx, ny, "N", color="white", ha="center", va="center", fontsize=8, fontweight="bold")
 
-                if goalx is not None and goaly is not None:
-                    ax.text(goalx, goaly, "G", color='green', fontsize=9, ha='center', va='center', fontweight='bold')
+                for ox, oy in obstaculos_list:
+                    ax.add_patch(patches.Rectangle((ox - 0.5, oy - 0.5), 1, 1, facecolor="black"))
 
                 total_gens = len(best_paths_per_gen)
                 if total_gens == 0:
@@ -220,7 +239,7 @@ class EstrategiaGenetica:
                 if total_gens - 1 not in plot_gens:
                     plot_gens.append(total_gens - 1)
 
-                colors = cm.rainbow(np.linspace(0, 1, len(plot_gens)))
+                colors = cm.rainbow(_np.linspace(0, 1, len(plot_gens)))
 
                 for idx_plot, i in enumerate(plot_gens):
                     if i < 0 or i >= len(best_paths_per_gen):
@@ -228,30 +247,27 @@ class EstrategiaGenetica:
                     path = best_paths_per_gen[i]
                     if not path:
                         continue
-                    x_vals = [p[0] for p in path]
-                    y_vals = [p[1] for p in path]
+                    xs = [p[0] for p in path]
+                    ys = [p[1] for p in path]
                     avg_label = avg_fitness_per_gen[i] if i < len(avg_fitness_per_gen) else 0.0
-                    ax.plot(x_vals, y_vals, label=f"Geração {i + 1} (Avg Fit: {avg_label:.2f})", alpha=0.7,
+                    ax.plot(xs, ys, label=f"Geração {i + 1} (Avg Fit: {avg_label:.2f})", alpha=0.7,
                             color=colors[idx_plot])
-                    ax.plot(x_vals[-1], y_vals[-1], 'x', markersize=8, color=colors[idx_plot])
+                    ax.plot(xs[-1], ys[-1], 'x', markersize=8, color=colors[idx_plot])
 
-                largura = getattr(ambiente, "largura", None)
-                altura = getattr(ambiente, "altura", None)
-                if largura is not None and altura is not None:
-                    ax.set_xlim(-1, largura + 1)
-                    ax.set_ylim(-1, altura + 1)
-                else:
-                    ax.set_xlim(-1, 100)
-                    ax.set_ylim(-1, 100)
-
+                ax.set_xlim(-1, larg + 1)
+                ax.set_ylim(-1, alt + 1)
+                ax.set_aspect('equal', adjustable='box')
                 ax.set_title("Evolução dos Melhores Caminhos por Geração")
                 ax.set_xlabel("X")
                 ax.set_ylabel("Y")
                 ax.grid(True)
-                ax.legend()
+                handles, labels = ax.get_legend_handles_labels()
+                if handles:
+                    ax.legend(loc='upper right', fontsize='small', ncol=1)
+
                 plt.tight_layout()
 
-                plt.figure(figsize=(10, 5))
+                plt.figure(figsize=(10, 4.5))
                 plt.plot(range(len(avg_fitness_per_gen)), avg_fitness_per_gen, marker='o')
                 plt.title("Fitness Médio por Geração")
                 plt.xlabel("Geração")
@@ -260,21 +276,23 @@ class EstrategiaGenetica:
                 plt.tight_layout()
 
                 fig2, ax2 = plt.subplots(figsize=(10, 10))
-                if walls:
-                    for wall in walls:
-                        if isinstance(wall, tuple) and len(wall) >= 2:
-                            wx, wy = wall[0], wall[1]
-                        else:
-                            wx, wy = getattr(wall, "x", None), getattr(wall, "y", None)
-                        if wx is not None and wy is not None:
-                            ax2.add_patch(patches.Rectangle((wx - 0.5, wy - 0.5), 1, 1, facecolor='black'))
 
-                if goalx is not None and goaly is not None:
-                    ax2.text(goalx, goaly, "G", color='green', fontsize=10, ha='center', va='center', fontweight='bold')
+                for (rx, ry), info in recursos_list:
+                    ax2.add_patch(
+                        patches.Circle((rx, ry), radius=0.4, facecolor="gold", alpha=0.6, edgecolor='k', linewidth=0.3))
+                    q = info.get("quantidade", "")
+                    ax2.text(rx, ry, f"{q}", color="black", ha="center", va="center", fontsize=7)
+
+                for nx, ny in ninhos_list:
+                    ax2.add_patch(patches.Circle((nx, ny), radius=0.5, facecolor="blue", edgecolor='k'))
+                    ax2.text(nx, ny, "N", color="white", ha="center", va="center", fontsize=8, fontweight="bold")
+
+                for ox, oy in obstaculos_list:
+                    ax2.add_patch(patches.Rectangle((ox - 0.5, oy - 0.5), 1, 1, facecolor="black"))
 
                 cmap = plt.get_cmap("viridis")
                 if last_generation:
-                    colors2 = cmap(np.linspace(0, 1, len(last_generation)))
+                    colors2 = cmap(_np.linspace(0, 1, len(last_generation)))
                     for i, agent in enumerate(last_generation):
                         if hasattr(agent, "path") and len(agent.path) > 1:
                             xs = [p[0] for p in agent.path]
@@ -282,22 +300,21 @@ class EstrategiaGenetica:
                             ax2.plot(xs, ys, color=colors2[i], alpha=0.5)
                             ax2.plot(xs[-1], ys[-1], 'x', color=colors2[i], markersize=6)
 
-                if largura is not None and altura is not None:
-                    ax2.set_xlim(-1, largura + 1)
-                    ax2.set_ylim(-1, altura + 1)
-                else:
-                    ax2.set_xlim(-1, 100)
-                    ax2.set_ylim(-1, 100)
-
+                ax2.set_xlim(-1, larg + 1)
+                ax2.set_ylim(-1, alt + 1)
+                ax2.set_aspect('equal', adjustable='box')
                 ax2.set_title("Todos os Caminhos – Última Geração")
                 ax2.set_xlabel("X")
                 ax2.set_ylabel("Y")
                 ax2.grid(True)
                 plt.tight_layout()
+
                 plt.show()
+
             except Exception as e:
                 print(f"[GA] Erro ao gerar gráficos: {e}")
 
         return best_weights, best_nn
+
 
 

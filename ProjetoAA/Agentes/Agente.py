@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from Objetos.Accao import Accao
-from Objetos.Observacao import Observacao
-from Objetos.Sensor import Sensor
+
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Objetos.Observacao import Observacao
+from ProjetoAA.Objetos.Sensor import Sensor
 
 
 class Agente(ABC):
