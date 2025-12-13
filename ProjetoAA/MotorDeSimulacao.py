@@ -127,7 +127,7 @@ class MotorDeSimulacao:
                     agente = AgenteFixo(posicao=list(pos), politica=config.get("politica", {}))
                 elif tipo == "AgenteAprendizagem":
                     tipo_estrategia = config.get("tipo_estrategia", config.get("estrategia", {}).get("nome", "qlearning"))
-                    agente = AgenteAprendizagem(nome=f"Aprendiz_{i}")
+                    agente = AgenteAprendizagem(nome=f"Aprendiz_{i}", politica=config.get("politica", {}), posicao=pos)
                     agente.tipo_estrategia = tipo_estrategia
                     agente.estrategia_conf = config.get("estrategia", config.get("estrategia_conf", {}))
                 else:
@@ -206,8 +206,8 @@ class MotorDeSimulacao:
                     populacao_tamanho=conf.get("populacao_tamanho", 100),
                     taxa_mutacao=conf.get("taxa_mutacao", 0.01),
                     num_geracoes=conf.get("num_ger", 25),
-                    tamanho_torneio=conf.get("tamanho_torneio", 3),
-                    elitismo_frac=conf.get("elitismo_frac", 0.2),
+                    tamanho_torneio=conf.get("tamanho_torneio", 2),
+                    elitismo_frac=conf.get("elitismo_frac", 0.1),
                     nn_arch=(input_size, output_size, conf.get("hidden", (16, 8))),
                     passos_por_avaliacao=conf.get("passos_por_avaliacao", 750),
                     mutation_std=conf.get("mutation_std", 0.1),
@@ -326,7 +326,7 @@ class MotorDeSimulacao:
             self.passos += 1
 
             if isinstance(self.ambiente, AmbienteFarol):
-                todos_terminaram = all(tuple(ag.pos) == self.ambiente.pos_farol for ag in self.agentes)
+                todos_terminaram = all(getattr(ag, "found_goal", False) for ag in self.agentes)
 
             if todos_terminaram:
                 print(f"Simulação terminada no passo {passo}!")
@@ -429,9 +429,9 @@ class MotorDeSimulacao:
 
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulacao_foraging.json")
+    simulador = MotorDeSimulacao().cria("simulador_farol_vazio.json")
     if simulador.ativo:
-        ""
+        """""
         for idx, agente in enumerate(simulador.agentes):
             if not isinstance(agente, AgenteAprendizagem):
                 continue
@@ -442,6 +442,6 @@ if __name__ == "__main__":
                 simulador.carregar_rede(f"models/AmbienteFarol_agente0_nn.pkl",idx)
             except FileNotFoundError:
                 print(f"[LOAD] NN não encontrada para agente {idx}, será usado aleatório.")
-                ""
-        #simulador.fase_treino()
+                """""
+        simulador.fase_treino()
         simulador.fase_teste()

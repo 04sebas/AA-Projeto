@@ -1,5 +1,6 @@
 import math
 import random
+from copy import deepcopy
 
 from ProjetoAA.Agentes.Agente import Agente
 from ProjetoAA.Ambientes.Ambiente import Ambiente
@@ -12,10 +13,11 @@ class AmbienteForaging(Ambiente):
     def __init__(self, largura=30, altura=30, recursos=None, ninhos=None, obstaculos=None):
         super().__init__(largura, altura, recursos, obstaculos)
 
-        self.recursos = {
+        self.initial_recursos = {
             tuple(r["pos"]): {"valor": r["valor"], "quantidade": r["quantidade"]}
             for r in (recursos or [])
         }
+        self.recursos = deepcopy(self.initial_recursos)
 
         self.ninhos = [tuple(n) for n in (ninhos or [])]
 
@@ -152,6 +154,7 @@ class AmbienteForaging(Ambiente):
         self.targets = {}
         for pos, info in self.recursos.items():
             info["quantidade"] = max(1, info.get("quantidade", 1))
+        self.recursos = deepcopy(self.initial_recursos)
 
     def _nearest_resource(self, pos):
         if not self.recursos:

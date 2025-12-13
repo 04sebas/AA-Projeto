@@ -7,19 +7,31 @@ mapa = {
     },
     "ambiente": {
         "tipo": "AmbienteForaging",
-        "largura": 100,
-        "altura": 100,
+        "largura": 50,
+        "altura": 50,
         "recursos": [
-            {"pos": [10, 10], "quantidade": 5, "valor": 10},
-            {"pos": [80, 10], "quantidade": 8, "valor": 20},
-            {"pos": [20, 40], "quantidade": 15, "valor": 5},
-            {"pos": [50, 50], "quantidade": 10, "valor": 15},
-            {"pos": [75, 75], "quantidade": 20, "valor": 25},
-            {"pos": [10, 80], "quantidade": 10, "valor": 10},
-            {"pos": [90, 90], "quantidade": 5, "valor": 30}
+            {"pos": [5, 5], "quantidade": 5, "valor": 10},
+            {"pos": [40, 5], "quantidade": 8, "valor": 20},
+            {"pos": [10, 20], "quantidade": 12, "valor": 8},
+            {"pos": [25, 25], "quantidade": 10, "valor": 15},
+            {"pos": [35, 35], "quantidade": 15, "valor": 25},
+            {"pos": [5, 40], "quantidade": 10, "valor": 10},
+            {"pos": [45, 45], "quantidade": 5, "valor": 30},
+
+            {"pos": [20, 10], "quantidade": 7, "valor": 12},
+            {"pos": [30, 15], "quantidade": 9, "valor": 18},
+            {"pos": [15, 30], "quantidade": 14, "valor": 9},
+            {"pos": [42, 28], "quantidade": 11, "valor": 14},
+            {"pos": [10, 45], "quantidade": 6, "valor": 22},
+            {"pos": [25, 5], "quantidade": 5, "valor": 11},
+            {"pos": [45, 10], "quantidade": 10, "valor": 17}
         ],
         "ninhos": [
-            [5, 5], [95, 95]
+            [3, 3],
+            [47, 47],
+            [3, 47],
+            [47, 3],
+            [25, 25]
         ],
         "obstaculos": []
     },
@@ -45,15 +57,6 @@ mapa = {
         }
     ]
 }
-
-obstaculos = []
-
-#obstaculos += [{"pos": [i, 25]} for i in range(50, 75)]
-#obstaculos += [{"pos": [i, 75]} for i in range(10, 50)]
-#obstaculos += [{"pos": [25, i]} for i in range(30, 75)]
-#obstaculos += [{"pos": [75, i]} for i in range(20, 80)]
-
-mapa["ambiente"]["obstaculos"] = obstaculos
 
 with open("simulacao_foraging.json", "w") as f:
     json.dump(mapa, f, indent=4)
