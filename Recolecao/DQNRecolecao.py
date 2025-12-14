@@ -36,7 +36,7 @@ class DqnSimulation:
         self.batch_size = 32
         self.target_update_freq = 50
         memory_size = 50000
-        self.episodes = 500
+        self.episodes = 100
         self.action_map = [(0, 1), (0, -1), (-1, 0), (1, 0)]
 
         # Initialize Q-networks
