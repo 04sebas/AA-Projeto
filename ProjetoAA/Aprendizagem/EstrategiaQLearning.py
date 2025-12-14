@@ -16,7 +16,7 @@ class EstrategiaDQN:
         gamma=0.99,
         epsilon=1.0,
         epsilon_min=0.1,
-        epsilon_decay=0.995,
+        epsilon_decay=0.985,
         batch_size=32,
         target_update_freq=50,
         memory_size=50000,
@@ -105,13 +105,12 @@ class EstrategiaDQN:
         self._build_networks(input_size, output_size, hidden)
         rewards_history = []
         paths = []
-        start = ambiente.posicao_aleatoria()
         for ep in range(self.episodes):
             if hasattr(ambiente, "reset"):
                 ambiente.reset()
 
             agent = AgenteAprendizagem()
-            agent.pos = list(start)
+            agent.pos = ambiente.posicao_aleatoria()
             ambiente.posicoes[agent] = tuple(agent.pos)
             agent.found_goal = False
             obs = ambiente.observacao_para(agent)
@@ -152,6 +151,155 @@ class EstrategiaDQN:
             if verbose:
                 print(f"[DQN] Ep {ep + 1}/{self.episodes} reward={ep_reward:.2f} eps={self.epsilon:.3f}")
         best_weights = self.policy.get_weights().copy()
+
+        if verbose:
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib.patches as patches
+                import matplotlib.cm as cm
+                import numpy as _np
+
+                larg = getattr(ambiente, "largura", 50)
+                alt = getattr(ambiente, "altura", 50)
+
+                recursos_raw = getattr(ambiente, "recursos", {})
+                ninhos_raw = getattr(ambiente, "ninhos", [])
+                obstaculos_raw = getattr(ambiente, "obstaculos", [])
+
+                recursos_list = []
+                if isinstance(recursos_raw, dict):
+                    for pos, info in recursos_raw.items():
+                        recursos_list.append((tuple(pos), dict(info)))
+                elif isinstance(recursos_raw, (list, tuple)):
+                    for r in recursos_raw:
+                        if isinstance(r, dict) and "pos" in r:
+                            recursos_list.append(
+                                (tuple(r["pos"]), {"quantidade": r.get("quantidade", 1), "valor": r.get("valor", 0)}))
+
+                ninhos_list = []
+                if isinstance(ninhos_raw, (list, tuple, set)):
+                    for n in ninhos_raw:
+                        try:
+                            ninhos_list.append(tuple(n))
+                        except:
+                            pass
+
+                obstaculos_list = []
+                if isinstance(obstaculos_raw, (list, tuple, set)):
+                    for o in obstaculos_raw:
+                        if isinstance(o, tuple) and len(o) >= 2:
+                            obstaculos_list.append(tuple(o))
+                        elif isinstance(o, list) and len(o) >= 2:
+                            obstaculos_list.append(tuple(o))
+                        elif isinstance(o, dict) and "pos" in o:
+                            obstaculos_list.append(tuple(o["pos"]))
+
+                plt.figure(figsize=(10, 4.5))
+                eps_idx = list(range(len(rewards_history)))
+                plt.plot(eps_idx, rewards_history, marker='o', label='Reward por episódio', alpha=0.6)
+
+                window = max(1, min(20, len(rewards_history) // 10 or 1))
+                if window > 1:
+                    movavg = _np.convolve(_np.array(rewards_history), _np.ones(window) / window, mode='valid')
+                    plt.plot(range(window - 1, window - 1 + len(movavg)), movavg, linewidth=2,
+                             label=f'Média móvel (w={window})')
+
+                plt.title("Reward por Episódio")
+                plt.xlabel("Episódio")
+                plt.ylabel("Reward")
+                plt.grid(True)
+                plt.legend()
+                plt.tight_layout()
+
+                try:
+                    eps_history = getattr(self, "epsilon_history", None)
+                    if eps_history is None:
+                        decay = self.epsilon_decay
+                        e = self.epsilon
+                        eps_history = []
+                        val = 1.0
+                        for _ in range(len(rewards_history)):
+                            eps_history.append(val)
+                            val = max(self.epsilon_min, val * decay)
+                    plt.figure(figsize=(8, 3))
+                    plt.plot(range(len(eps_history)), eps_history, marker='.', label='Epsilon')
+                    plt.title("Epsilon ao longo do treino")
+                    plt.xlabel("Episódio")
+                    plt.ylabel("Epsilon")
+                    plt.grid(True)
+                    plt.tight_layout()
+                except Exception:
+                    pass
+
+                fig, ax = plt.subplots(figsize=(10, 10))
+
+                for (rx, ry), info in recursos_list:
+                    ax.add_patch(patches.Circle((rx, ry), radius=0.45, facecolor="gold", alpha=0.8, edgecolor='k',
+                                                linewidth=0.3))
+                    q = info.get("quantidade", "")
+                    ax.text(rx, ry, f"{q}", color="black", ha="center", va="center", fontsize=7)
+
+                for nx, ny in ninhos_list:
+                    ax.add_patch(patches.Circle((nx, ny), radius=0.5, facecolor="blue", edgecolor='k'))
+                    ax.text(nx, ny, "N", color="white", ha="center", va="center", fontsize=8, fontweight="bold")
+
+                for ox, oy in obstaculos_list:
+                    ax.add_patch(patches.Rectangle((ox - 0.5, oy - 0.5), 1, 1, facecolor="black"))
+
+                if len(paths) > 0:
+                    rewards_arr = _np.array(rewards_history)
+                    best_idx = int(_np.argmax(rewards_arr))
+                    topk = 6
+                    top_indices = list(_np.argsort(-rewards_arr)[:topk])
+                    colors = cm.rainbow(_np.linspace(0, 1, len(top_indices)))
+
+                    for ci, idx in enumerate(top_indices):
+                        path = paths[idx]
+                        if not path:
+                            continue
+                        xs = [p[0] for p in path]
+                        ys = [p[1] for p in path]
+                        ax.plot(xs, ys, label=f"Ep {idx} (R={rewards_history[idx]:.1f})", alpha=0.8, linewidth=1.5,
+                                color=colors[ci])
+                        ax.plot(xs[-1], ys[-1], 'x', markersize=8, color=colors[ci])
+
+                    best_path = paths[best_idx]
+                    if best_path:
+                        xs = [p[0] for p in best_path]
+                        ys = [p[1] for p in best_path]
+                        ax.plot(xs, ys, color='red', linewidth=2.5, alpha=0.9,
+                                label=f"Melhor Ep {best_idx} (R={rewards_history[best_idx]:.1f})")
+                        ax.plot(xs[-1], ys[-1], 'X', color='red', markersize=10)
+
+                try:
+                    visit_counts = _np.zeros((alt, larg), dtype=int)
+                    for path in paths:
+                        for (vx, vy) in path:
+                            if 0 <= int(vx) < larg and 0 <= int(vy) < alt:
+                                visit_counts[int(vy), int(vx)] += 1
+                    vmax = visit_counts.max() if visit_counts.max() > 0 else 1
+                    ax.imshow(visit_counts, origin='lower', cmap='hot', alpha=0.35,
+                              extent=(-0.5, larg - 0.5, -0.5, alt - 0.5), vmin=0, vmax=vmax)
+                except Exception:
+                    pass
+
+                ax.set_xlim(-1, larg + 1)
+                ax.set_ylim(-1, alt + 1)
+                ax.set_aspect('equal', adjustable='box')
+                ax.set_title("Trajetórias — DQN (top trajectories & heatmap)")
+                ax.set_xlabel("X")
+                ax.set_ylabel("Y")
+                ax.grid(True)
+                handles, labels = ax.get_legend_handles_labels()
+                if handles:
+                    ax.legend(loc='upper right', fontsize='small')
+
+                plt.tight_layout()
+                plt.show()
+
+            except Exception as e:
+                print(f"[DQN] Erro ao gerar gráficos: {e}")
+
         return best_weights, self.policy.nn
 
 
