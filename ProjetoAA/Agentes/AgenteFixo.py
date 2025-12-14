@@ -1,10 +1,10 @@
-from Agentes.Agente import Agente
-from Aprendizagem.Politicas import politica_aleatoria, politica_greedy, DIRECOES
-from Objetos.Accao import Accao
-from Objetos.Observacao import Observacao
 import json
+from ProjetoAA.Agentes.Agente import Agente
+from ProjetoAA.Aprendizagem.Politicas import DIRECOES, politica_aleatoria, politica_greedy
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Objetos.Observacao import Observacao
+from ProjetoAA.Objetos.Sensor import Sensor
 
-from Objetos.Sensor import Sensor
 
 class AgenteFixo(Agente):
     def __init__(self, posicao=None, politica=None):
@@ -13,11 +13,12 @@ class AgenteFixo(Agente):
         super().__init__(posicao, "AF")
         politica = politica or {}
         alcance = politica.get("alcance", 5)
+        self.found_goal = False
         self.sensores = Sensor(alcance=alcance)
+        self.trainable = False
         self.ultima_obs = None
         self.politica = politica
         self.ultima_direcao = None
-        self.recompensa_total = 0
         self.recursos_recolhidos = 0
         self.recursos_depositados = 0
         self.ultimo_ninho = None
@@ -93,6 +94,9 @@ class AgenteFixo(Agente):
 
 
     def age(self) -> Accao:
+        if self.found_goal:
+            return Accao("ficar")
+
         obs = self.ultima_obs
         if obs is None:
             return Accao("ficar")

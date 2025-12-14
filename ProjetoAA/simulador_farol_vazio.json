@@ -1,0 +1,111 @@
+{
+  "simulador": {
+    "max_passos": 1000,
+    "visualizacao": true
+  },
+
+  "ambiente": {
+    "tipo": "AmbienteFarol",
+    "largura": 100,
+    "altura": 100,
+    "pos_farol": [50, 75],
+    "obstaculos": []
+  },
+  "agentes": [
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 0,
+      "posicao_inicial": [5, 5],
+      "trainable": false,
+      "politica": {
+        "tipo": "greedy",
+        "alcance": 8
+      }
+    },
+
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 0,
+      "posicao_inicial": [10, 10],
+      "trainable": false,
+      "politica": {
+        "tipo": "random",
+        "alcance": 3
+      }
+    },
+
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 0,
+      "posicao_inicial": "random",
+      "trainable": true,
+      "tipo_estrategia": "genetica",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia_conf": {
+        "populacao_tamanho": 100,
+        "taxa_mutacao": 0.01,
+        "num_ger": 50,
+        "tamanho_torneio": 3,
+        "elitismo_frac": 0.2,
+        "hidden": [16, 8],
+        "passos_por_avaliacao": 500,
+        "mutation_std": 0.1
+      }
+    },
+
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 1,
+      "posicao_inicial": "random",
+      "trainable": true,
+      "tipo_estrategia": "dqn",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia_conf": {
+        "hidden": [16, 8],
+        "episodes": 100,
+        "passos_por_ep": 500,
+        "gamma": 0.99,
+        "epsilon": 1.0,
+        "epsilon_min": 0.1,
+        "epsilon_decay": 0.985,
+        "batch_size": 32,
+        "target_update_freq": 50,
+        "memory_size": 50000,
+        "learning_rate": 0.002
+      }
+    }
+  ],
+
+  "estrategia": [
+    {
+      "tipo": "genetica",
+      "populacao_tamanho": 100,
+      "taxa_mutacao": 0.02,
+      "num_ger": 50,
+      "tamanho_torneio": 3,
+      "elitismo_frac": 0.1,
+      "hidden": [16, 8],
+      "passos_por_avaliacao": 500,
+      "mutation_std": 0.05
+    },
+
+    {
+      "tipo": "dqn",
+      "hidden": [32, 16],
+      "episodes": 200,
+      "passos_por_ep": 500,
+      "gamma": 0.99,
+      "epsilon": 1.0,
+      "epsilon_min": 0.1,
+      "epsilon_decay": 0.990,
+      "batch_size": 64,
+      "target_update_freq": 50,
+      "memory_size": 20000,
+      "learning_rate": 0.0005
+    }
+  ]
+}

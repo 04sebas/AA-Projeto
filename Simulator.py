@@ -36,7 +36,7 @@ class Simulator:
         a.dqnRun()
 
 if __name__ == "__main__":
-    sim = Simulator("Recolecao")
+    sim = Simulator("Farol")
     if sim.farol:
         print("RUNNING FAROL")
         sim.runSimulationFarol()

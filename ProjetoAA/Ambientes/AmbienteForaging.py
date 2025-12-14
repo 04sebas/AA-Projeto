@@ -1,32 +1,46 @@
+import math
 import random
-from Agentes.Agente import Agente
-from Aprendizagem.Politicas import DIRECOES
-from Objetos.Accao import Accao
-from Objetos.Observacao import Observacao
-from Ambientes.Ambiente import Ambiente
+from copy import deepcopy
+
+from ProjetoAA.Agentes.Agente import Agente
+from ProjetoAA.Ambientes.Ambiente import Ambiente
+from ProjetoAA.Aprendizagem.Politicas import DIRECOES
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Objetos.Observacao import Observacao
 
 
 class AmbienteForaging(Ambiente):
     def __init__(self, largura=30, altura=30, recursos=None, ninhos=None, obstaculos=None):
         super().__init__(largura, altura, recursos, obstaculos)
-
-        self.recursos = {
+        self.carry_capacity = 1
+        self.initial_recursos = {
             tuple(r["pos"]): {"valor": r["valor"], "quantidade": r["quantidade"]}
             for r in (recursos or [])
         }
+        self.recursos = deepcopy(self.initial_recursos)
 
         self.ninhos = [tuple(n) for n in (ninhos or [])]
 
-        self.obstaculos = {tuple(o["pos"]) for o in (obstaculos or [])}
+        parsed_obst = set()
+        for o in (obstaculos or []):
+            if isinstance(o, dict) and "pos" in o:
+                parsed_obst.add(tuple(o["pos"]))
+            elif isinstance(o, (list, tuple)) and len(o) >= 2:
+                parsed_obst.add((int(o[0]), int(o[1])))
+        self.obstaculos = parsed_obst
 
         self.posicoes = {}
         self.cargas = {}
         self.tempo = 0
+        self.targets = {}
 
     def observacao_para(self, agente):
         pos = self.posicoes.get(agente, (0, 0))
 
         percepcoes = agente.sensores.perceber(self, pos)
+        tgt = self.targets.get(agente)
+        if tgt is not None and tgt not in self.recursos and tgt not in self.ninhos:
+            self.targets[agente] = None
 
         if pos in self.recursos:
             r = self.recursos[pos]
@@ -42,15 +56,36 @@ class AmbienteForaging(Ambiente):
                 "tipo": "ninho"
             })
 
-        obs = Observacao(percepcoes)
+        alcance = getattr(agente.sensores, "alcance", 3)
+        for outro_agente, outra_pos in self.posicoes.items():
+            if outro_agente is agente:
+                continue
+            ox, oy = outra_pos
+            px, py = pos
+            if abs(ox - px) <= alcance and abs(oy - py) <= alcance:
+                percepcoes.append({
+                    "pos": tuple(outra_pos),
+                    "tipo": "agente",
+                    "ref": outro_agente
+                })
 
+        if self.targets.get(agente) is None:
+            carrying = self.cargas.get(agente, 0) > 0
+            if carrying:
+                tgt = self._nearest_ninho(pos)
+            else:
+                tgt = self._nearest_resource(pos)
+            if tgt is not None:
+                self.targets[agente] = tgt
+
+        obs = Observacao(percepcoes)
         obs.posicao = pos
         obs.carga = self.cargas.get(agente, 0)
-
         obs.largura = self.largura
         obs.altura = self.altura
-
+        obs.goal = self.targets.get(agente)
         agente.ultima_obs = obs
+        obs.foraging = True
 
         return obs
 
@@ -59,41 +94,150 @@ class AmbienteForaging(Ambiente):
         dx, dy = DIRECOES.get(accao.nome, (0, 0))
         nova_pos = [pos[0] + dx, pos[1] + dy]
 
-        if 0 <= nova_pos[0] < self.largura and 0 <= nova_pos[1] < self.altura:
-            if tuple(nova_pos) not in self.obstaculos:
-                self.posicoes[agente] = tuple(nova_pos)
-                pos = nova_pos
+        if not (0 <= nova_pos[0] < self.largura and 0 <= nova_pos[1] < self.altura):
+            return -1
 
-        recompensa = 0
-        pos_tuple = tuple(pos)
+        if tuple(nova_pos) in self.obstaculos:
+            return -1
 
-        if accao.nome == "recolher" and pos_tuple in self.recursos:
-            if self.cargas.get(agente, 0) < 1:
-                recurso = self.recursos[pos_tuple]
-                recompensa = recurso["valor"]
-                self.cargas[agente] = 1
-                recurso["quantidade"] -= 1
+        current_pos = tuple(pos)
+        target = self.targets.get(agente)
+        carrying = self.cargas.get(agente, 0) > 0
+        if target is None:
+            if carrying:
+                target = self._nearest_ninho(current_pos)
+            else:
+                target = self._nearest_resource(current_pos)
+            if target is not None:
+                self.targets[agente] = target
+
+        prev_dist = self._normalized_distance(current_pos, target)
+
+        self.posicoes[agente] = tuple(nova_pos)
+        pos = nova_pos
+        agente.pos = list(self.posicoes[agente])
+
+        new_pos = tuple(pos)
+        if accao.nome == "recolher" and new_pos in self.recursos:
+            carga_atual = self.cargas.get(agente, 0)
+            if carga_atual < self.carry_capacity:
+                recurso = self.recursos[new_pos]
+                recompensa = 100.0 + recurso.get("valor", 25)
+                agente.last_resource_value = int(recurso.get("valor", 1))
+                self.cargas[agente] = carga_atual + 1
+
                 if hasattr(agente, "recursos_recolhidos"):
                     agente.recursos_recolhidos += 1
+
+                recurso["quantidade"] -= 1
+
                 if recurso["quantidade"] <= 0:
-                    del self.recursos[pos_tuple]
+                    del self.recursos[new_pos]
+                    self._invalidate_targets_for_resource(new_pos)
 
-        if accao.nome == "depositar" and pos_tuple in self.ninhos:
+                if self.cargas[agente] >= self.carry_capacity:
+                    self.targets[agente] = self._nearest_ninho(new_pos)
+                else:
+                    self.targets[agente] = self._nearest_resource(new_pos) or self._nearest_ninho(new_pos)
+
+                return recompensa
+            else:
+                return 1.0
+
+        if accao.nome == "depositar" and new_pos in self.ninhos:
             carga = self.cargas.get(agente, 0)
-            recompensa = carga * 10
-            self.cargas[agente] = 0
-            if hasattr(agente, "recursos_depositados"):
-                agente.recursos_depositados += carga
 
-        agente.pos = list(self.posicoes[agente])
+            if carga > 0:
+                last_val = getattr(agente, "last_resource_value", 1)
+
+                recompensa = 200.0 + float(last_val)
+
+                self.cargas[agente] = 0
+                agente.last_resource_value = 0
+
+                if hasattr(agente, "recursos_depositados"):
+                    agente.recursos_depositados += carga
+
+                self.targets[agente] = self._nearest_resource(new_pos)
+
+                return recompensa
+            else:
+                return 1.0
+
+        target_after = self.targets.get(agente)
+        new_dist = self._normalized_distance(new_pos, target_after)
+
+        recompensa = -0.05
+        if target_after is None:
+            recompensa += 0.0
+        else:
+            if prev_dist is not None and new_dist is not None:
+                delta = prev_dist - new_dist
+                recompensa += delta * 3.0
+                if delta > 0.01:
+                    recompensa += 0.2
+
         return recompensa
 
     def atualizacao(self):
         self.tempo += 1
 
-    def posicao_aleatoria(self):
-        while True:
-            x = random.randint(0, self.largura - 1)
-            y = random.randint(0, self.altura - 1)
-            if (x, y) not in self.obstaculos:
-                return x, y
+    def reset(self):
+        self.posicoes = {}
+        self.cargas = {}
+        self.tempo = 0
+        self.targets = {}
+        self.recursos = deepcopy(self.initial_recursos)
+
+    def _nearest_resource(self, pos):
+        if not self.recursos:
+            return None
+        px, py = pos
+        best = None
+        best_d = None
+        for rpos in self.recursos.keys():
+            dx = rpos[0] - px
+            dy = rpos[1] - py
+            d = math.hypot(dx, dy)
+            if best_d is None or d < best_d:
+                best_d = d
+                best = rpos
+        return best
+
+    def _nearest_ninho(self, pos):
+        if not self.ninhos:
+            return None
+        px, py = pos
+        best = None
+        best_d = None
+        for npos in self.ninhos:
+            dx = npos[0] - px
+            dy = npos[1] - py
+            d = math.hypot(dx, dy)
+            if best_d is None or d < best_d:
+                best_d = d
+                best = npos
+        return best
+
+    def _normalized_distance(self, pos, target):
+        if target is None:
+            return None
+        dx = pos[0] - target[0]
+        dy = pos[1] - target[1]
+        dist = math.hypot(dx, dy)
+        max_dist = math.hypot(self.largura, self.altura) or 1.0
+        return dist / max_dist
+
+    def _invalidate_targets_for_resource(self, resource_pos):
+        for ag, tgt in list(self.targets.items()):
+            if tgt == resource_pos:
+                agent_pos = self.posicoes.get(ag)
+                if agent_pos is None:
+                    self.targets[ag] = None
+                else:
+                    if self.cargas.get(ag, 0) > 0:
+                        self.targets[ag] = self._nearest_ninho(agent_pos)
+                    else:
+                        self.targets[ag] = self._nearest_resource(agent_pos)
+
+

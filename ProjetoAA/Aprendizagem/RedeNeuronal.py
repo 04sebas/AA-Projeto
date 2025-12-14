@@ -1,15 +1,26 @@
 import random
-
 import numpy as np
-
 
 def compute_layer_outputs(inputs, weights, biases, activation_function):
     z = np.dot(inputs, weights) + biases
     outputs = activation_function(z)
     return outputs
 
+def create_network_architecture(input_size, output_size, neurons):
+    nn = RedeNeuronal(input_size, output_size, neurons, hidden_activation=relu, output_activation=output_fn)
+    num_weights = nn.compute_num_weights()
+    weights = [random.uniform(-1, 1) for _ in range(num_weights)]
+    nn.load_weights(weights)
 
-class NeuralNetwork:
+    return nn
+
+def relu(x):
+    return np.maximum(0, x)
+
+def output_fn(x):
+    return x
+
+class RedeNeuronal:
 
     def __init__(self, input_size, output_size, hidden_architecture, hidden_activation, output_activation):
         self.output_weights = None
@@ -44,24 +55,24 @@ class NeuralNetwork:
         input_size = self.input_size
         for n in self.hidden_architecture:
             end_w = start_w + (input_size + 1) * n
-            self.hidden_biases.append(w[start_w:start_w+n])
-            self.hidden_weights.append(w[start_w+n:end_w].reshape(input_size, n))
+            if end_w > w.size:
+                raise ValueError(f"load_weights: tamanho insuficiente do vector de pesos (need {end_w}, got {w.size})")
+            self.hidden_biases.append(w[start_w:start_w + n])
+            self.hidden_weights.append(w[start_w + n:end_w].reshape(input_size, n))
             start_w = end_w
             input_size = n
 
         end_w = start_w + (input_size + 1) * self.output_size
+        if end_w > w.size:
+            raise ValueError(f"load_weights: tamanho insuficiente do vector de pesos (need {end_w}, got {w.size})")
         self.output_bias = w[start_w:start_w + self.output_size]
         self.output_weights = w[start_w + self.output_size:end_w].reshape(input_size, self.output_size)
 
-
-
     def forward(self, x):
-        input = x
+        a = x
         for weights, bias in zip(self.hidden_weights, self.hidden_biases):
-            input = compute_layer_outputs(x, weights, bias, self.hidden_activation)
-
-        output = compute_layer_outputs(input, self.output_weights, self.output_bias, self.output_activation)
-
+            a = compute_layer_outputs(a, weights, bias, self.hidden_activation)
+        output = compute_layer_outputs(a, self.output_weights, self.output_bias, self.output_activation)
         return output
 
     def forward_with_cache(self, x):
@@ -121,7 +132,6 @@ class NeuralNetwork:
             grad_hidden_W.insert(0, grad_W_l)
             grad_hidden_b.insert(0, grad_b_l)
 
-
         grads = []
         for Wg, bg in zip(grad_hidden_W, grad_hidden_b):
             grads.extend(bg.flatten())
@@ -130,6 +140,23 @@ class NeuralNetwork:
         grads.extend(grad_output_W.flatten())
 
         return np.array(grads)
+
+    def flatten_params(self):
+        return np.concatenate([w.flatten() for w in self.weights])
+
+    def unflatten_params(self, flat_params):
+        new_weights = []
+        idx = 0
+        for w in self.weights:
+            size = w.size
+            new_w = flat_params[idx:idx + size].reshape(w.shape)
+            new_weights.append(new_w)
+            idx += size
+        self.weights = new_weights
+
+    def flatten_grads(self, grads):
+        return np.concatenate([g.flatten() for g in grads])
+
 
 class Adam:
     def __init__(self, params, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8):
@@ -154,18 +181,3 @@ class Adam:
             v_hat = self.v / (1 - self.beta2 ** self.steps)
 
             self.params -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
-
-def create_network_architecture(input_size, output_size, neurons):
-
-    def relu(x):
-        return np.maximum(0, x)
-
-    def output_fn(x):
-        return x
-   
-    nn =  NeuralNetwork(input_size, output_size, neurons, hidden_activation=relu, output_activation=output_fn)
-    num_weights = nn.compute_num_weights()
-    weights = [random.uniform(-1, 1) for _ in range(num_weights)]
-    nn.load_weights(weights)
-
-    return nn

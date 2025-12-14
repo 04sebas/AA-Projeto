@@ -8,10 +8,8 @@ import numpy as np
 class AgenteLearner :
     
     def __init__(self, farol, neural_network):
-        
         self.weights = None
         self.actions =  [(0, 1), (0, -1), (1, 0), (-1, 0)]
-        
         self.foundGoal = False
         self.num_steps = 1000
         self.x = farol.agentx
@@ -89,7 +87,7 @@ class AgenteLearner :
             self.foundGoal = True
             self.y = newy
             self.x = newx
-            return 1000, True
+            return 1500, True
 
         elif isinstance(obj, Wall):
 
@@ -107,7 +105,6 @@ class AgenteLearner :
 
 
     def run_genetic_simulation(self, start_x=None, start_y=None):
-
         self.foundGoal = False
         self.behavior = set()
         self.path = []

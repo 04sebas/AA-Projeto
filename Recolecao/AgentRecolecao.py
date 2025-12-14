@@ -35,7 +35,6 @@ class AgenteRecolecao:
         self.delivered = 0
         self.done = False
         self.maxCollected = 5
-
     def surroundings(self):
         observation = self.amb.observation(self.x, self.y, depth=3)
         obs = []
@@ -72,6 +71,7 @@ class AgenteRecolecao:
                     obs.append(-0.9)  # None is outside
 
         return obs
+
 
     def setPosition(self, x, y):
         self.x = x

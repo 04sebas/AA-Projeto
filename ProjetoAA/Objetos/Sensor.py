@@ -1,5 +1,5 @@
 class Sensor:
-    def __init__(self, alcance: int = 3):
+    def __init__(self, alcance: int = 2):
         self.alcance = alcance
 
     def perceber(self, ambiente, posicao_agente):
@@ -34,3 +34,5 @@ class Sensor:
                     visiveis.append({"tipo": "ninho", "pos": pos})
 
         return visiveis
+
+
