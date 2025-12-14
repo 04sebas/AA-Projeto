@@ -11,7 +11,6 @@
     "pos_farol": [50, 75],
     "obstaculos": []
   },
-
   "agentes": [
     {
       "tipo": "AgenteFixo",
@@ -37,7 +36,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",
@@ -58,7 +57,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "dqn",
@@ -66,17 +65,17 @@
         "alcance": 3
       },
       "estrategia_conf": {
-        "hidden": [32, 16],
+        "hidden": [16, 8],
         "episodes": 100,
         "passos_por_ep": 500,
         "gamma": 0.99,
         "epsilon": 1.0,
         "epsilon_min": 0.1,
-        "epsilon_decay": 0.990,
-        "batch_size": 64,
+        "epsilon_decay": 0.985,
+        "batch_size": 32,
         "target_update_freq": 50,
-        "memory_size": 20000,
-        "learning_rate": 0.0005
+        "memory_size": 50000,
+        "learning_rate": 0.002
       }
     }
   ],

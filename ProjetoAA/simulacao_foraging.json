@@ -9,27 +9,38 @@
     "largura": 50,
     "altura": 50,
     "recursos": [
-      { "pos": [10, 10], "quantidade": 5,  "valor": 2 },
-      { "pos": [20, 15], "quantidade": 3,  "valor": 5 },
-      { "pos": [35, 40], "quantidade": 8,  "valor": 1 }
+      { "pos": [5, 5], "quantidade": 1, "valor": 100 },
+      { "pos": [10, 10], "quantidade": 1, "valor": 150 },
+      { "pos": [15, 8], "quantidade": 1, "valor": 50 },
+      { "pos": [20, 15], "quantidade": 1, "valor": 250 },
+      { "pos": [25, 20], "quantidade": 1, "valor": 100 },
+      { "pos": [30, 25], "quantidade": 1, "valor": 200 },
+      { "pos": [35, 40], "quantidade": 1, "valor": 50 },
+      { "pos": [40, 10], "quantidade": 1, "valor": 150 },
+      { "pos": [45, 30], "quantidade": 1, "valor": 100 },
+      { "pos": [12, 35], "quantidade": 1, "valor": 200 }
     ],
     "ninhos": [
       [2, 2],
-      [47, 47]
+      [47, 47],
+      [5, 45],
+      [45, 5]
     ],
     "obstaculos": [
-      [15, 15],
-      [16, 15],
-      [17, 15],
-      [30, 25],
-      [30, 26]
+      { "pos": [15, 15] },
+      { "pos": [16, 15] },
+      { "pos": [17, 15] },
+      { "pos": [30, 25] },
+      { "pos": [30, 26] },
+      { "pos": [22, 35] },
+      { "pos": [40, 20] }
     ]
   },
 
   "agentes": [
     {
       "tipo": "AgenteFixo",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": [5, 5],
       "trainable": false,
       "politica": {
@@ -50,29 +61,26 @@
     {
       "tipo": "AgenteAprendizagem",
       "quantidade": 1,
-      "posicao_inicial": "random",
+      "posicao_inicial": [[0,0]],
       "trainable": true,
       "tipo_estrategia": "genetica",
       "politica": {
         "alcance": 3
       },
-      "estrategia": {
-        "nome": "genetica"
-      },
       "estrategia_conf": {
-        "populacao_tamanho": 60,
-        "taxa_mutacao": 0.02,
-        "num_ger": 30,
+        "populacao_tamanho": 100,
+        "taxa_mutacao": 0.01,
+        "num_ger": 50,
         "tamanho_torneio": 3,
-        "elitismo_frac": 0.1,
-        "hidden": [32, 16],
-        "passos_por_avaliacao": 500,
-        "mutation_std": 0.05
+        "elitismo_frac": 0.2,
+        "hidden": [16, 8],
+        "passos_por_avaliacao": 1000,
+        "mutation_std": 0.1
       }
     },
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "dqn",

@@ -12,7 +12,7 @@ from ProjetoAA.Objetos.Observacao import Observacao
 class AmbienteForaging(Ambiente):
     def __init__(self, largura=30, altura=30, recursos=None, ninhos=None, obstaculos=None):
         super().__init__(largura, altura, recursos, obstaculos)
-
+        self.carry_capacity = 1
         self.initial_recursos = {
             tuple(r["pos"]): {"valor": r["valor"], "quantidade": r["quantidade"]}
             for r in (recursos or [])
@@ -21,7 +21,13 @@ class AmbienteForaging(Ambiente):
 
         self.ninhos = [tuple(n) for n in (ninhos or [])]
 
-        self.obstaculos = {tuple(o["pos"]) for o in (obstaculos or [])}
+        parsed_obst = set()
+        for o in (obstaculos or []):
+            if isinstance(o, dict) and "pos" in o:
+                parsed_obst.add(tuple(o["pos"]))
+            elif isinstance(o, (list, tuple)) and len(o) >= 2:
+                parsed_obst.add((int(o[0]), int(o[1])))
+        self.obstaculos = parsed_obst
 
         self.posicoes = {}
         self.cargas = {}
@@ -32,6 +38,9 @@ class AmbienteForaging(Ambiente):
         pos = self.posicoes.get(agente, (0, 0))
 
         percepcoes = agente.sensores.perceber(self, pos)
+        tgt = self.targets.get(agente)
+        if tgt is not None and tgt not in self.recursos and tgt not in self.ninhos:
+            self.targets[agente] = None
 
         if pos in self.recursos:
             r = self.recursos[pos]
@@ -59,6 +68,15 @@ class AmbienteForaging(Ambiente):
                     "tipo": "agente",
                     "ref": outro_agente
                 })
+
+        if self.targets.get(agente) is None:
+            carrying = self.cargas.get(agente, 0) > 0
+            if carrying:
+                tgt = self._nearest_ninho(pos)
+            else:
+                tgt = self._nearest_resource(pos)
+            if tgt is not None:
+                self.targets[agente] = tgt
 
         obs = Observacao(percepcoes)
         obs.posicao = pos
@@ -101,46 +119,63 @@ class AmbienteForaging(Ambiente):
 
         new_pos = tuple(pos)
         if accao.nome == "recolher" and new_pos in self.recursos:
-            if self.cargas.get(agente, 0) < 1:
+            carga_atual = self.cargas.get(agente, 0)
+            if carga_atual < self.carry_capacity:
                 recurso = self.recursos[new_pos]
-                recompensa = 5
-                self.cargas[agente] = 1
-                recurso["quantidade"] -= 1
+                recompensa = 100.0 + recurso.get("valor", 25)
+                agente.last_resource_value = int(recurso.get("valor", 1))
+                self.cargas[agente] = carga_atual + 1
+
                 if hasattr(agente, "recursos_recolhidos"):
                     agente.recursos_recolhidos += 1
+
+                recurso["quantidade"] -= 1
+
                 if recurso["quantidade"] <= 0:
                     del self.recursos[new_pos]
                     self._invalidate_targets_for_resource(new_pos)
-                    if self.targets.get(agente) == new_pos:
-                        self.targets[agente] = self._nearest_ninho(new_pos) or self._nearest_resource(new_pos)
-                self.targets[agente] = self._nearest_ninho(new_pos) or self._nearest_resource(new_pos)
+
+                if self.cargas[agente] >= self.carry_capacity:
+                    self.targets[agente] = self._nearest_ninho(new_pos)
+                else:
+                    self.targets[agente] = self._nearest_resource(new_pos) or self._nearest_ninho(new_pos)
+
                 return recompensa
             else:
-                recompensa = 1
-                return recompensa
+                return 1.0
 
         if accao.nome == "depositar" and new_pos in self.ninhos:
             carga = self.cargas.get(agente, 0)
+
             if carga > 0:
-                recompensa = 10
+                last_val = getattr(agente, "last_resource_value", 1)
+
+                recompensa = 200.0 + float(last_val)
+
                 self.cargas[agente] = 0
+                agente.last_resource_value = 0
+
                 if hasattr(agente, "recursos_depositados"):
                     agente.recursos_depositados += carga
+
                 self.targets[agente] = self._nearest_resource(new_pos)
+
                 return recompensa
             else:
-                recompensa = 1
-                return recompensa
+                return 1.0
 
         target_after = self.targets.get(agente)
         new_dist = self._normalized_distance(new_pos, target_after)
 
+        recompensa = -0.05
         if target_after is None:
-            recompensa = 0.1
+            recompensa += 0.0
         else:
-            recompensa = -0.05
-            if new_dist is not None and prev_dist is not None and new_dist < prev_dist:
-                recompensa += 1.0
+            if prev_dist is not None and new_dist is not None:
+                delta = prev_dist - new_dist
+                recompensa += delta * 3.0
+                if delta > 0.01:
+                    recompensa += 0.2
 
         return recompensa
 
@@ -152,8 +187,6 @@ class AmbienteForaging(Ambiente):
         self.cargas = {}
         self.tempo = 0
         self.targets = {}
-        for pos, info in self.recursos.items():
-            info["quantidade"] = max(1, info.get("quantidade", 1))
         self.recursos = deepcopy(self.initial_recursos)
 
     def _nearest_resource(self, pos):

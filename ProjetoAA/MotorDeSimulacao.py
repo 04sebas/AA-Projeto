@@ -429,7 +429,7 @@ class MotorDeSimulacao:
 
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulador_farol_vazio.json")
+    simulador = MotorDeSimulacao().cria("simulacao_foraging.json")
     if simulador.ativo:
         """""
         for idx, agente in enumerate(simulador.agentes):

@@ -33,6 +33,7 @@ class AgenteAprendizagem(Agente):
         self.found_goal = False
         self.resources = set()
         self.ninhos = set()
+        self.last_resource_value = 0
 
     def observacao(self, obs):
         self.ultima_obs = obs
@@ -136,8 +137,12 @@ class AgenteAprendizagem(Agente):
         features = []
 
         goal = getattr(obs, "goal", None)
-        gx, gy = goal if goal else (None, None)
-        dist_current = math.sqrt((px - gx) ** 2 + (py - gy) ** 2)
+        if goal is not None:
+            gx, gy = goal
+            dist_current = math.sqrt((px - gx) ** 2 + (py - gy) ** 2)
+        else:
+            gx = gy = None
+            dist_current = None
 
         for dy in range(-alcance, alcance + 1):
             for dx in range(-alcance, alcance + 1):
@@ -153,7 +158,7 @@ class AgenteAprendizagem(Agente):
                         features.append(-0.9)
                     elif tipo in ("recurso", "farol"):
                         if getattr(obs, "carga", 0) <= 0:
-                            features.append(0.9)
+                            features.append(0.8)
                         else:
                             features.append(0.1)
                     elif tipo == "ninho":
@@ -162,7 +167,7 @@ class AgenteAprendizagem(Agente):
                         else:
                             features.append(0.1)
                     else:
-                        features.append(-0.1)
+                        features.append(0.0)
                 else:
                     if gx is not None and gy is not None:
                         dist_cell = math.sqrt((pos_check[0] - gx) ** 2 + (pos_check[1] - gy) ** 2)
@@ -186,13 +191,13 @@ class AgenteAprendizagem(Agente):
         goal = getattr(obs, "goal", None)
         if goal is not None:
             gx, gy = goal
-            goal_x = gx / largura
-            goal_y = gy / altura
+            goal_x = (gx - px) / max(1.0, largura)
+            goal_y = (gy - py) / max(1.0, altura)
         else:
             goal_x = 0.0
             goal_y = 0.0
 
-        carrying = float(bool(getattr(obs, "carga", getattr(obs, "carrying", False))))
+        carrying = float(obs.carga > 0)
 
         return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y, carrying])).astype(np.float32)
 
