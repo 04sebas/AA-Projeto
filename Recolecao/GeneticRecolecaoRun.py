@@ -37,7 +37,7 @@ class GeneticSimulation:
     def geneticRun(self, plot_results):
         # --- EA Hyperparameters ---
         POPULATION_SIZE = 100
-        NUM_GENERATIONS = 25
+        NUM_GENERATIONS = 50
         MUTATION_RATE = 0.05
         TOURNAMENT_SIZE = 5
 
@@ -74,6 +74,7 @@ class GeneticSimulation:
             for agent in population:
                 agent.run_genetic_simulation()
                 total_fitness += agent.getFitness()
+                #print(f"Random steps: {agent.randomStepNum}")
 
             # 2. Sort population by *fitness*
 
@@ -148,7 +149,7 @@ class GeneticSimulation:
                 ax.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
 
             # Plot paths
-            plot_gens = [0,5,9, 14, 19, 24]
+            plot_gens = [0,10,20,30,40,49]
             for i in plot_gens:
                 path = best_paths_per_gen[i]
                 avg_fitness = avg_fitness_per_gen[i]  # Get the avg combined fitness
