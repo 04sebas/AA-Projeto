@@ -18,8 +18,8 @@ class GeneticSimulation:
         child1_geno = np.concatenate([parent1.neural_network.weights[:point], parent2.neural_network.weights[point:]])
         child2_geno = np.concatenate([parent2.neural_network.weights[:point], parent1.neural_network.weights[point:]])
 
-        nn1 = NeuralNetwork.create_network_architecture(17, 4, (16,8 ))
-        nn2 = NeuralNetwork.create_network_architecture(17, 4, (16,8 ))
+        nn1 = NeuralNetwork.create_network_architecture(16, 4, (16,8 ))
+        nn2 = NeuralNetwork.create_network_architecture(16, 4, (16,8 ))
 
         nn1.load_weights(child1_geno)
         nn2.load_weights(child2_geno)
@@ -37,8 +37,8 @@ class GeneticSimulation:
     def geneticRun(self, plot_results):
         # --- EA Hyperparameters ---
         POPULATION_SIZE = 100
-        NUM_GENERATIONS = 25
-        MUTATION_RATE = 0.01
+        NUM_GENERATIONS = 50
+        MUTATION_RATE = 0.05
         TOURNAMENT_SIZE = 5
 
         # --- Initialization ---
@@ -47,13 +47,13 @@ class GeneticSimulation:
         amb = AmbienteRecolecao("Recolecao.txt")
 
         for _ in range(POPULATION_SIZE):
-            nn = NeuralNetwork.create_network_architecture(17, 4, (16, 8))
+            nn = NeuralNetwork.create_network_architecture(16, 4, (16, 8))
             num_weights = nn.compute_num_weights()
             weights = [random.uniform(-1, 1) for _ in range(num_weights)]
             nn.load_weights(weights)
             agent = AgenteRecolecao(amb, nn)
-
             population.append(agent)
+
         avg_fitness_per_gen = []
         best_paths_per_gen = []
 
@@ -68,13 +68,13 @@ class GeneticSimulation:
 
             # 1. Evaluate Population
             for agent in population:
-                agent.setPosition(0,0)
                 agent.reset()
                 agent.setAmbiente(AmbienteRecolecao("Recolecao.txt"))
 
             for agent in population:
                 agent.run_genetic_simulation()
                 total_fitness += agent.getFitness()
+                #print(f"Random steps: {agent.randomStepNum}")
 
             # 2. Sort population by *fitness*
 
@@ -85,8 +85,6 @@ class GeneticSimulation:
             # 3. Log results for this generation
             avg_fitness = total_fitness / POPULATION_SIZE
             best_paths_per_gen.append(population[0].path)
-
-            best_obj = population[0].fitness
 
             print(
                 f"Gen {gen + 1}/{NUM_GENERATIONS} | Avg Fitness: {avg_fitness:.2f} | Best Fitness: {population[0].fitness:.2f})")
@@ -99,7 +97,7 @@ class GeneticSimulation:
             n_elite = POPULATION_SIZE // 5
 
             for elite_agent in population[:n_elite]:
-                nn_copy = NeuralNetwork.create_network_architecture(17, 4, (16,8))
+                nn_copy = NeuralNetwork.create_network_architecture(16, 4, (16,8))
                 nn_copy.load_weights(elite_agent.neural_network.weights.copy())
                 new_agent = AgenteRecolecao(amb, nn_copy)  # Use MAIN farol
                 new_population.append(new_agent)
@@ -151,7 +149,7 @@ class GeneticSimulation:
                 ax.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
 
             # Plot paths
-            plot_gens = [0,5,10,15, NUM_GENERATIONS - 1]
+            plot_gens = [0,10,20,30,40,49]
             for i in plot_gens:
                 path = best_paths_per_gen[i]
                 avg_fitness = avg_fitness_per_gen[i]  # Get the avg combined fitness
