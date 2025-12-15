@@ -182,5 +182,6 @@ def create_network_architecture(input_size, output_Size, neurons):
     num_weights = nn.compute_num_weights()
     weights = [random.uniform(-1, 1) for _ in range(num_weights)]
     nn.load_weights(weights)
+    nn.weights
 
     return nn

@@ -74,10 +74,26 @@ class AmbienteForaging(Ambiente):
 
         if self.targets.get(agente) is None:
             carrying = self.cargas.get(agente, 0) > 0
-            if carrying:
-                tgt = self._nearest_ninho(pos)
+
+            # Get currently perceivable objects
+            perceivable_resources = [
+                p["pos"] for p in percepcoes
+                if p.get("tipo") == "recurso"
+            ]
+            perceivable_nests = [
+                p["pos"] for p in percepcoes
+                if p.get("tipo") == "ninho"
+            ]
+
+            if carrying and perceivable_nests:
+                import math
+                tgt = min(perceivable_nests, key=lambda np: math.hypot(np[0] - pos[0], np[1] - pos[1]))
+            elif not carrying and perceivable_resources:
+                import math
+                tgt = min(perceivable_resources, key=lambda rp: math.hypot(rp[0] - pos[0], rp[1] - pos[1]))
             else:
-                tgt = self._nearest_resource(pos)
+                tgt = None
+
             if tgt is not None:
                 self.targets[agente] = tgt
 
@@ -105,16 +121,8 @@ class AmbienteForaging(Ambiente):
 
         current_pos = tuple(pos)
         target = self.targets.get(agente)
-        carrying = self.cargas.get(agente, 0) > 0
-        if target is None:
-            if carrying:
-                target = self._nearest_ninho(current_pos)
-            else:
-                target = self._nearest_resource(current_pos)
-            if target is not None:
-                self.targets[agente] = target
 
-        prev_dist = self._normalized_distance(current_pos, target)
+        prev_dist = self._normalized_distance(current_pos, target) if target else None
 
         self.posicoes[agente] = tuple(nova_pos)
         pos = nova_pos
@@ -136,10 +144,7 @@ class AmbienteForaging(Ambiente):
                 if recurso["quantidade"] <= 0:
                     self._invalidate_targets_for_resource(new_pos)
 
-                if self.cargas[agente] >= self.carry_capacity:
-                    self.targets[agente] = self._nearest_ninho(new_pos)
-                else:
-                    self.targets[agente] = self._nearest_resource(new_pos) or self._nearest_ninho(new_pos)
+                self.targets[agente] = None
 
                 return recompensa
             else:
@@ -158,7 +163,7 @@ class AmbienteForaging(Ambiente):
                 if hasattr(agente, "recursos_depositados"):
                     agente.recursos_depositados += carga
 
-                self.targets[agente] = self._nearest_resource(new_pos)
+                self.targets[agente] = None
 
                 return recompensa
             else:
@@ -167,14 +172,18 @@ class AmbienteForaging(Ambiente):
             return -0.3
 
         target_after = self.targets.get(agente)
-        new_dist = self._normalized_distance(new_pos, target_after)
+        new_dist = self._normalized_distance(new_pos, target_after) if target_after else None
 
-        recompensa = -0.1
-        if prev_dist is not None and new_dist is not None:
-            if new_dist < prev_dist:
-                recompensa += 0.5
-            elif new_dist > prev_dist:
-                recompensa -= 0.05
+        recompensa = -0.05
+
+        if target_after is None:
+            recompensa += 0.1
+        else:
+            if prev_dist is not None and new_dist is not None:
+                delta = prev_dist - new_dist
+                recompensa += delta * 3.0
+                if delta > 0.01:
+                    recompensa += 0.2
 
         return recompensa
 
@@ -187,39 +196,6 @@ class AmbienteForaging(Ambiente):
         self.tempo = 0
         self.targets = {}
         self.recursos = deepcopy(self.initial_recursos)
-
-    def _nearest_resource(self, pos):
-        if not self.recursos:
-            return None
-        px, py = pos
-        best = None
-        best_d = None
-        for rpos, info in self.recursos.items():
-            quantidade = int(info.get("quantidade", 0))
-            if quantidade <= 0:
-                continue
-            dx = rpos[0] - px
-            dy = rpos[1] - py
-            d = math.hypot(dx, dy)
-            if best_d is None or d < best_d:
-                best_d = d
-                best = rpos
-        return best
-
-    def _nearest_ninho(self, pos):
-        if not self.ninhos:
-            return None
-        px, py = pos
-        best = None
-        best_d = None
-        for npos in self.ninhos:
-            dx = npos[0] - px
-            dy = npos[1] - py
-            d = math.hypot(dx, dy)
-            if best_d is None or d < best_d:
-                best_d = d
-                best = npos
-        return best
 
     def _normalized_distance(self, pos, target):
         if target is None:
