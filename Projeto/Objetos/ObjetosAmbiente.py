@@ -18,8 +18,14 @@ class Resource:
         self.x = xx
         self.y = yy
 
-class Delivery:
+class DeliveryPoint:
     def __init__(self, xx, yy):
         self.name = "Delivery"
+        self.x = xx
+        self.y = yy
+
+class Goal:
+    def __init__(self, xx, yy):
+        self.name = "Farol"
         self.x = xx
         self.y = yy
