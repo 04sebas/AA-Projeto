@@ -97,12 +97,21 @@ class EstrategiaDQN:
         if self.optim_steps % self.target_update_freq == 0:
             self.target.load_weights(self.policy.get_weights().copy())
 
-    def run(self, ambiente, verbose=True):
+    def run(self, ambiente, verbose=True, input_size=None,alcance=None):
         sample_agent = AgenteAprendizagem()
-        input_size = sample_agent.get_input_size()
+
+        if alcance is not None:
+            sample_agent = AgenteAprendizagem(politica={"alcance": alcance})
+            input_size = sample_agent.get_input_size()
+        elif input_size is None:
+            sample_agent = AgenteAprendizagem()
+            input_size = sample_agent.get_input_size()
+
+        sample_agent = AgenteAprendizagem(politica={"alcance": int(getattr(sample_agent, "sensores").alcance)})
         output_size = len(sample_agent.nomes_accao)
         hidden = self.nn_arch[2] if len(self.nn_arch) >= 3 else (16, 8)
         self._build_networks(input_size, output_size, hidden)
+
         rewards_history = []
         paths = []
         start = [0,0]
@@ -110,7 +119,7 @@ class EstrategiaDQN:
             if hasattr(ambiente, "reset"):
                 ambiente.reset()
 
-            agent = AgenteAprendizagem()
+            agent = AgenteAprendizagem(politica={"alcance": sample_agent.sensores.alcance})
             agent.pos = start
             ambiente.posicoes[agent] = tuple(agent.pos)
             agent.found_goal = False

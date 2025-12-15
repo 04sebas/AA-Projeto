@@ -168,14 +168,17 @@ class MotorDeSimulacao:
                         nome=f"AgenteFixo_{i}"
                     )
                 elif tipo == "AgenteAprendizagem":
+                    politica_agente = config.get("politica", {})
+                    tipo_estrategia = config.get("tipo_estrategia", "genetica")
+
                     agente = AgenteAprendizagem(
-                        nome=f"Agente_{i}",
-                        politica=config.get("politica", {}),
+                        nome=f"Agente Aprendizagem {tipo_estrategia}",
+                        politica=politica_agente,
                         posicao=list(pos)
                     )
 
                     agente.trainable = bool(config.get("trainable", False))
-                    agente.tipo_estrategia = config.get("tipo_estrategia", "genetica")
+                    agente.tipo_estrategia = tipo_estrategia
                     agente.estrategia_conf = config.get("estrategia_conf", {})
                 else:
                     raise ValueError(f"Tipo de agente desconhecido: {tipo}")
@@ -253,6 +256,69 @@ class MotorDeSimulacao:
 
         print(f"[LOAD] Apenas weights_flat carregados para agente {agente_idx} (tipo={tipo}).")
 
+    def load_networks(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
+        summary = {}
+
+        if agents is None:
+            agents = list(range(len(self.agentes)))
+
+        file_map = file_map or {}
+
+        for idx in agents:
+            if idx < 0 or idx >= len(self.agentes):
+                summary[idx] = {"status": "error", "msg": "Índice de agente inválido"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Índice inválido: {idx}")
+                continue
+
+            agente = self.agentes[idx]
+
+            if not getattr(agente, "trainable", False):
+                summary[idx] = {"status": "skipped", "msg": "agente não treinável"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Agente {idx} (não treinável) - skip")
+                continue
+
+            filepath = None
+            if idx in file_map:
+                filepath = file_map[idx]
+            elif pattern is not None:
+                try:
+                    filepath = pattern.format(idx=idx)
+                except Exception as e:
+                    summary[idx] = {"status": "error", "msg": f"Erro a formatar pattern: {e}"}
+                    if verbose:
+                        print(f"[LOAD_NETWORKS] Erro a formatar pattern para agente {idx}: {e}")
+                    continue
+            else:
+                summary[idx] = {"status": "skipped", "msg": "nenhum pattern nem file_map fornecido"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Agente {idx} - nenhum ficheiro especificado")
+                continue
+
+            try:
+                self.carregar_rede(filepath, idx)
+                summary[idx] = {"status": "loaded", "msg": filepath}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Sucesso: agente {idx} <- {filepath}")
+            except FileNotFoundError:
+                summary[idx] = {"status": "missing", "msg": filepath}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Ficheiro não encontrado para agente {idx}: {filepath}")
+            except Exception as e:
+                summary[idx] = {"status": "error", "msg": str(e)}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Erro ao carregar agente {idx} de {filepath}: {e}")
+
+        return summary
+
+    def autoload_if_flag(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
+        if getattr(self, "autoload_models", False):
+            return self.load_networks(pattern=pattern, file_map=file_map, agents=agents, verbose=verbose)
+        if verbose:
+            print("[autoload_if_flag] autoload_models não activado; nenhum ficheiro carregado.")
+        return {}
+
     def fase_treino(self):
         saved_files = {}
 
@@ -300,7 +366,7 @@ class MotorDeSimulacao:
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = ga.run(self.ambiente, verbose=True)
+                best_weights, best_nn = ga.run(self.ambiente, verbose=True,input_size=input_size)
 
                 self.ambiente.reset()
 
@@ -339,7 +405,7 @@ class MotorDeSimulacao:
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = dqn.run(self.ambiente, verbose=True)
+                best_weights, best_nn = dqn.run(self.ambiente, verbose=True,input_size=input_size,alcance=agente.sensores.alcance)
 
                 self.ambiente.reset()
 
@@ -626,21 +692,15 @@ class MotorDeSimulacao:
 
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulador_foraging_vazio.json")
+    simulador = MotorDeSimulacao().cria("simulador_farol_vazio.json")
     if simulador.ativo:
-        ""
-        for idx, agente in enumerate(simulador.agentes):
-            if not isinstance(agente, AgenteAprendizagem):
-                continue
-            if not getattr(agente, "trainable", False):
-                continue
+        file_map = {
+            1: "models/AmbienteFarol_agente1_genetica_v5.pkl"
+        }
+        #resumo = simulador.load_networks(file_map=file_map, agents=[1])
+        #print(resumo)
 
-            try:
-                simulador.carregar_rede(f"models/AmbienteForaging_agente0_nn.pkl",idx)
-            except FileNotFoundError:
-                print(f"[LOAD] NN não encontrada para agente {idx}, será usado aleatório.")
-                ""
-        #simulador.fase_treino()
+        simulador.fase_treino()
         simulador.fase_teste()
-        simulador.salvar_animacao_gif("models/trajetorias.gif", fps=12, trail_len=30)
+        #simulador.salvar_animacao_gif("models/trajetorias_foraging.gif", fps=12, trail_len=30)
 

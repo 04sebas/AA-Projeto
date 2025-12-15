@@ -65,11 +65,10 @@ class EstrategiaGenetica:
         self.populacao = pop
         self.fitness = np.zeros(self.populacao_tamanho, dtype=np.float32)
 
-    def run(self, ambiente, verbose=True):
+    def run(self, ambiente, verbose=True, input_size=3):
         dummy_agent = AgenteAprendizagem(politica={"alcance": 3})
         if hasattr(ambiente, "get_action_names"):
             dummy_agent.set_action_space(ambiente.get_action_names())
-        input_size = dummy_agent.get_input_size()
         num_actions = len(dummy_agent.nomes_accao)
         available_actions = dummy_agent.nomes_accao
         sensor_range = getattr(dummy_agent.sensores, "alcance", 3)
@@ -107,9 +106,9 @@ class EstrategiaGenetica:
                 agent.recursos_depositados = 0
 
                 if isinstance(ambiente, AmbienteFarol):
-                    start = ambiente.posicao_aleatoria_treino()
+                    start = ambiente.posicao_aleatoria()
                 else:
-                    start = [0,0]
+                    start = [0,45]
 
                 ambiente.posicoes[agent] = tuple(start)
                 agent.pos = tuple(start)
@@ -124,12 +123,7 @@ class EstrategiaGenetica:
                     reward = ambiente.agir(acc, agent) or None
                     fitness += float(reward)
                     agent.path.append(agent.pos)
-
-                    done_flag = False
-                    if ambiente.nome == "AmbienteFarol":
-                        done_flag = bool(getattr(agent, "found_goal", False) or (ambiente.posicoes.get(agent) == getattr(ambiente, "pos_farol", None)))
-                    elif ambiente.nome == "AmbienteForaging":
-                        done_flag = ambiente.terminou([agent])
+                    done_flag = ambiente.terminou([agent])
 
                     if done_flag:
                         break
@@ -241,11 +235,19 @@ class EstrategiaGenetica:
                 total_gens = len(best_paths_per_gen)
                 if total_gens == 0:
                     total_gens = 1
-                plot_gens = list(range(min(24, total_gens)))
-                if total_gens - 1 not in plot_gens:
-                    plot_gens.append(total_gens - 1)
 
-                colors = cm.rainbow(_np.linspace(0, 1, len(plot_gens)))
+                top_n = min(5, total_gens)
+                scores = avg_fitness_per_gen if len(avg_fitness_per_gen) == len(best_paths_per_gen) else [0.0] * len(
+                    best_paths_per_gen)
+                gen_indices = list(range(len(best_paths_per_gen)))
+                if gen_indices:
+                    sorted_by_score = sorted(gen_indices, key=lambda i: scores[i] if i < len(scores) else 0.0,
+                                             reverse=True)
+                    plot_gens = sorted(sorted_by_score[:top_n])
+                else:
+                    plot_gens = []
+
+                colors = cm.rainbow(_np.linspace(0, 1, len(plot_gens))) if plot_gens else []
 
                 for idx_plot, i in enumerate(plot_gens):
                     if i < 0 or i >= len(best_paths_per_gen):
@@ -263,7 +265,7 @@ class EstrategiaGenetica:
                 ax.set_xlim(-1, larg + 1)
                 ax.set_ylim(-1, alt + 1)
                 ax.set_aspect('equal', adjustable='box')
-                ax.set_title("Evolução dos Melhores Caminhos por Geração")
+                ax.set_title("Evolução dos Melhores Caminhos (Top 5 Gerações)")
                 ax.set_xlabel("X")
                 ax.set_ylabel("Y")
                 ax.grid(True)

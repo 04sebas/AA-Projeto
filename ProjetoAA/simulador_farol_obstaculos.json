@@ -186,7 +186,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",
@@ -200,13 +200,14 @@
         "tamanho_torneio": 3,
         "elitismo_frac": 0.2,
         "hidden": [16, 8],
-        "passos_por_avaliacao": 500,
+        "passos_por_avaliacao": 750,
         "mutation_std": 0.1
       }
     },
+
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "dqn",
@@ -226,35 +227,6 @@
         "memory_size": 50000,
         "learning_rate": 0.002
       }
-    }
-  ],
-
-  "estrategia": [
-    {
-      "tipo": "genetica",
-      "populacao_tamanho": 100,
-      "taxa_mutacao": 0.02,
-      "num_ger": 50,
-      "tamanho_torneio": 3,
-      "elitismo_frac": 0.1,
-      "hidden": [16, 8],
-      "passos_por_avaliacao": 500,
-      "mutation_std": 0.05
-    },
-
-    {
-      "tipo": "dqn",
-      "hidden": [32, 16],
-      "episodes": 200,
-      "passos_por_ep": 500,
-      "gamma": 0.99,
-      "epsilon": 1.0,
-      "epsilon_min": 0.1,
-      "epsilon_decay": 0.990,
-      "batch_size": 64,
-      "target_update_freq": 50,
-      "memory_size": 20000,
-      "learning_rate": 0.0005
     }
   ]
 }
