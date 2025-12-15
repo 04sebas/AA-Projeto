@@ -45,6 +45,12 @@ class EstrategiaDQN:
         self.optimizer = Adam(self.policy.nn.weights, lr=self.learning_rate)
 
     def select_action(self, state):
+        state = np.asarray(state, dtype=np.float32)
+        expected = getattr(self.policy.nn, "input_size", None)
+        if expected is None:
+            expected = self.policy.nn.weights[0].shape[0]
+        if state.shape[0] != expected:
+            raise ValueError(f"[DQN] state size {state.shape[0]} != network input_size {expected}")
         if random.random() < self.epsilon:
             return random.randint(0, self.policy.nn.output_size - 1)
         q = self.policy.forward(state)
@@ -81,6 +87,8 @@ class EstrategiaDQN:
         for i in range(self.batch_size):
             state = states[i]
             action = actions[i]
+            if state.shape[0] != self.policy.nn.input_size:
+                raise RuntimeError(f"nn_input mismatch: {state.shape[0]} vs {self.policy.nn.input_size}")
             q_values = self.policy.forward(state)
             target = q_values.copy()
             target[action] = target_q[i]
@@ -97,20 +105,23 @@ class EstrategiaDQN:
         if self.optim_steps % self.target_update_freq == 0:
             self.target.load_weights(self.policy.get_weights().copy())
 
-    def run(self, ambiente, verbose=True, input_size=None,alcance=None):
-        sample_agent = AgenteAprendizagem()
-
+    def run(self, ambiente, verbose=True, alcance=None):
         if alcance is not None:
-            sample_agent = AgenteAprendizagem(politica={"alcance": alcance})
-            input_size = sample_agent.get_input_size()
-        elif input_size is None:
-            sample_agent = AgenteAprendizagem()
-            input_size = sample_agent.get_input_size()
-
-        sample_agent = AgenteAprendizagem(politica={"alcance": int(getattr(sample_agent, "sensores").alcance)})
+            sample_agent = AgenteAprendizagem(politica={"alcance": int(alcance)})
+        else:
+            default_alc = getattr(ambiente, "default_sensor_alcance", None)
+            if default_alc is not None:
+                sample_agent = AgenteAprendizagem(politica={"alcance": int(default_alc)})
+            else:
+                sample_agent = AgenteAprendizagem()  # usa default do agente
+        input_size = sample_agent.get_input_size()
         output_size = len(sample_agent.nomes_accao)
         hidden = self.nn_arch[2] if len(self.nn_arch) >= 3 else (16, 8)
         self._build_networks(input_size, output_size, hidden)
+
+        if self.policy.nn.input_size != input_size:
+            raise RuntimeError(
+                f"[DQN] inconsistency: policy input_size {self.policy.nn.input_size} != expected {input_size}")
 
         rewards_history = []
         paths = []
@@ -146,11 +157,7 @@ class EstrategiaDQN:
                 next_state = agent.build_nn_input(obs_next)
                 state = state.astype(np.float32)
                 next_state = next_state.astype(np.float32)
-                done_flag = False
-                if ambiente.nome == "AmbienteFarol":
-                    done_flag = bool(getattr(agent, "found_goal", False) or (ambiente.posicoes.get(agent) == getattr(ambiente, "pos_farol", None)))
-                elif ambiente.nome == "AmbienteForaging":
-                    done_flag = ambiente.terminou([agent])
+                done_flag = ambiente.terminou([agent])
                 self.memory.append((state, action_idx, float(reward), next_state, done_flag))
                 warmup = max(self.batch_size * 2, 1000)
                 if len(self.memory) >= warmup:
