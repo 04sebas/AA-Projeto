@@ -4,28 +4,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, patches
 from numpy import argmax
-from Farol import AmbienteFarol, AgentFarol
-import NeuralNetwork
-from Recolecao.AgentRecolecao import AgenteRecolecao
-from Recolecao.AmbienteRecolecao import AmbienteRecolecao
+
+from Projeto.Ambientes.AmbienteFarol import AmbienteFarol
+from Projeto.Aprendizagem import NeuralNetwork
+from Projeto.Ambientes.AmbienteRecolecao import AmbienteRecolecao
+from Projeto.Agentes.AgenteAprendizagem import AgenteAprendizagem
+from Projeto.Objetos.ObjetosAmbiente import Goal
 
 
 class Dqn_nn:
     def __init__(self, inputSize, outputSize):
-        self.nn = NeuralNetwork.create_network_architecture(inputSize, outputSize, (16,16))
-
+        self.nn = NeuralNetwork.create_network_architecture(inputSize, outputSize, (16, 16))
+        self.weigths = self.nn.weights.copy()
     def forward(self, input):
         return self.nn.forward(input)
 
     def compute_gradients(self, x, target):
         return self.nn.compute_gradients(x, target)
 
-class DqnSimulation:
+class EstrategiaDqn:
 
-    def __init__(self):
+    def __init__(self, input):
 
         self.optimization_steps = 0
-        self.amb = AmbienteRecolecao("Recolecao.txt")
 
         # Hyperparameters
         learning_rate = 0.002
@@ -40,7 +41,7 @@ class DqnSimulation:
         self.action_map = [(0, 1), (0, -1), (-1, 0), (1, 0)]
 
         # Initialize Q-networks
-        inputSize = 16
+        inputSize = input
         outputSize = 4
 
         self.policy_nn = Dqn_nn(inputSize, outputSize)
@@ -68,7 +69,7 @@ class DqnSimulation:
             return
 
         batch = random.sample(self.memory, self.batch_size)
-        states, actions, rewards, next_states = zip(*batch)
+        states, actions, rewards, next_states, dones = zip(*batch)
 
         states = np.array(states)
         next_states = np.array(next_states)
@@ -122,7 +123,9 @@ class DqnSimulation:
         x = agent.x / agent.amb.size
         y = agent.y / agent.amb.size
 
-        surroundings = agent.surroundings()
+        agent.observacao(3)
+
+        obs = agent.obs
 
         goalx, goaly = 0, 0
 
@@ -131,39 +134,124 @@ class DqnSimulation:
             goaly = agent.currentGoal.y / agent.amb.size
 
 
+        if agent.amb.type == "Recolecao":
+            return np.array([x, y, *obs, goalx, goaly])
+        else:
+            return np.array([x, y, *obs, agent.distanceToGoal(agent.x, agent.y)])
 
-        return np.array([x, y, *surroundings, goalx, goaly])
-
-    def dqnRun(self):
+    def dqnRun(self, fileName, type):
         self.optimization_steps = 0
         rewards_per_episode = []
         pathsPerEpisode = []
+        num_steps = 1500
+        amb = None
         for episode in range(self.episodes):
 
+            if type == "Farol":
+                amb = AmbienteFarol(fileName)
+            elif type == "Recolecao":
+                amb = AmbienteRecolecao(fileName)
+            else:
+                print("Type incorrect.")
+                return
             print(f"Episode {episode + 1} start")
-
-            agent = AgenteRecolecao(self.amb, None)
-
-            self.amb.reset()
+            amb.reset()
 
             #Agent sim
-            episode_reward, path = agent.run_DQN_simulation(None, None, self)
+            ##ALGORITMO
+            stepsDone = 0
+            episodeReward = 0
+            path = []
+            agent = AgenteAprendizagem(amb, self.policy_nn)
+            x, y = amb.random_valid_position()
+            agent.setPosition(x, y)
+            done = False
+
+            if amb.type == "Farol":
+                agent.currentGoal = Goal(agent.amb.goalx, agent.amb.goaly)
+
+            for _ in range(num_steps):
+
+
+                agent.observacao(3)  # Observa antes de random step, caso haja algum goal
+                agent.update_goal_from_observation()
+                state = self.getState(agent)
+                reward = 0
+                action_index = 0
+
+                if agent.currentGoal is None:
+                    if not agent.carrying:
+                        if agent.resources:
+                            goals = list(agent.resources)
+                            agent.currentGoal = agent.closest(goals)
+
+                        else:
+                            agent.randomStepNum += 1
+                            stepReward, action_index, done = agent.randomStep()
+                            reward += stepReward
+                            agent.path.append((agent.x, agent.y))
+                    else:
+                        if agent.delivery:
+                            goals = list(agent.delivery)
+                            agent.currentGoal = agent.closest(goals)
+
+                        else:
+                            agent.randomStepNum += 1
+                            stepReward, action_index, done = agent.randomStep()
+                            reward += stepReward
+                            agent.path.append((agent.x, agent.y))
+                else:
+
+                    current_distance = abs(agent.x - agent.currentGoal.x) + abs(agent.y - agent.currentGoal.y)
+                    if agent.amb.type == "Recolecao":
+                        if agent.amb.lastGoalDistance is None or current_distance < agent.amb.lastGoalDistance:
+                            agent.amb.lastGoalDistance = current_distance
+                            agent.amb.goalStepsWithoutProgress = 0
+                        else:
+                            agent.amb.goalStepsWithoutProgress += 1
+
+                        if agent.amb.goalStepsWithoutProgress >= agent.amb.maxGoalSteps:
+                            agent.amb.currentGoal = None
+                            agent.amb.goalStepsWithoutProgress = 0
+                            agent.amb.lastGoalDistance = None
+                            continue
+                    action_index = self.select_action(state, self.epsilon)
+
+                    reward, done = agent.age(action_index)
+
+                path.append((agent.x, agent.y))
+
+                episodeReward += reward
+
+                next_state = self.getState(agent)
+
+                # Store transition in memory
+                self.memory.append((state, action_index, reward, next_state, done))
+
+                # Optimize model
+                self.optimize_model()
+
+                stepsDone += 1
 
             # Decay epsilon
             self.epsilon = max(self.epsilon_min, self.epsilon_decay * self.epsilon)
 
-
-            rewards_per_episode.append(episode_reward)
+            rewards_per_episode.append(episodeReward)
             pathsPerEpisode.append(path)
 
             # Add periodic logging
             if episode % 5 == 0:
                 print(f"Epsilon: {self.epsilon:.3f}, Memory: {len(self.memory)}")
 
-            print(f"Episode {episode + 1} reward: {episode_reward}")
-            print(f"Random steps per episode: {agent.randomStepNum}")
-            print(f"Resources delivered: {agent.delivered}\n")
+            print(f"Episode {episode + 1} reward: {episodeReward}")
 
+            if agent.amb.type == "Recolecao":
+                print(f"Random steps per episode: {agent.randomStepNum}")
+                print(f"Resources delivered: {agent.delivered}\n")
+            else:
+                print(f"Distance to goal: {agent.distanceToGoal(agent.x, agent.y)}")
+            if done:
+                print(f"Episode {episode + 1} done, found goal in: {stepsDone}")
         # Plotting the rewards per episode
         window = 10
         avg_rewards = [
@@ -183,7 +271,7 @@ class DqnSimulation:
         colors = cm.rainbow(np.linspace(0, 1, len(pathsPerEpisode)))
 
         # Plot walls and goal
-        for wall in self.amb.walls:
+        for wall in amb.walls:
             ax.add_patch(
                 patches.Rectangle(
                     (wall.x - 0.5, wall.y - 0.5),  # lower-left corner
@@ -192,15 +280,15 @@ class DqnSimulation:
                 )
             )
 
-        for resource in self.amb.resources:
+        for resource in amb.resources:
             ax.text(resource.x, resource.y, "R", color='green', fontsize=9, ha='center', va='center',
                     fontweight='bold')
 
-        for delivery in self.amb.deliveryPoints:
+        for delivery in amb.deliveryPoints:
             ax.text(delivery.x, delivery.y, "P", color='red', fontsize=9, ha='center', va='center',
                     fontweight='bold')
 
-        for agente in self.amb.agentes:
+        for agente in amb.agentes:
             ax.text(agente.x, agente.y, "A", color='blue', fontsize=9, ha='center', va='center', fontweight='bold')
 
         # Plot paths

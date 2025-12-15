@@ -1,9 +1,9 @@
+import random
 from abc import ABC, abstractmethod
-from typing import List
 
-from Agentes.Agente import Agente
-from Objetos.Accao import Accao
-from Objetos.Observacao import Observacao
+from ProjetoAA.Agentes.Agente import Agente
+from ProjetoAA.Objetos.Accao import Accao
+from ProjetoAA.Objetos.Observacao import Observacao
 
 
 class Ambiente(ABC):
@@ -49,3 +49,43 @@ class Ambiente(ABC):
         if (x, y) in self.obstaculos:
             return False
         return True
+
+    def posicao_aleatoria(self):
+        cols, rows = 3, 3
+        passo_x = self.largura // (cols + 1)
+        passo_y = self.altura // (rows + 1)
+        posicoes = []
+
+        for r in range(1, rows + 1):
+            for c in range(1, cols + 1):
+                x = passo_x * c
+                y = passo_y * r
+                pos = (x, y)
+
+                if pos in self.obstaculos or pos in self.recursos:
+                    continue
+
+                posicoes.append(pos)
+
+        if not posicoes:
+            tentativa = 0
+            while True:
+                x = random.randint(0, self.largura - 1)
+                y = random.randint(0, self.altura - 1)
+                pos = (x, y)
+                if pos not in self.obstaculos and pos not in self.recursos:
+                    return pos
+                tentativa += 1
+                if tentativa > 1000:
+                    raise RuntimeError("Não foi possível encontrar uma posição livre.")
+
+        return random.choice(posicoes)
+
+    def posicao_aleatoria_treino(self):
+        while True:
+            x = random.randint(0, self.largura - 1)
+            y = random.randint(0, self.altura - 1)
+            if (x, y) not in self.obstaculos and (x,y) not in self.recursos:
+                return x, y
+
+
