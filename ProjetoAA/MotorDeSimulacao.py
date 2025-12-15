@@ -348,7 +348,7 @@ class MotorDeSimulacao:
                 input_size = agente.get_input_size()
             except Exception:
                 alcance = getattr(agente.sensores, "alcance", 3)
-                input_size = (2 * alcance + 1) ** 2 - 1 + 3
+                input_size = (2 * alcance + 1) ** 2 - 1 + 5
 
             output_size = len(available_actions)
 
@@ -405,7 +405,7 @@ class MotorDeSimulacao:
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = dqn.run(self.ambiente, verbose=True,input_size=input_size,alcance=agente.sensores.alcance)
+                best_weights, best_nn = dqn.run(self.ambiente, verbose=True,alcance=agente.sensores.alcance)
 
                 self.ambiente.reset()
 
