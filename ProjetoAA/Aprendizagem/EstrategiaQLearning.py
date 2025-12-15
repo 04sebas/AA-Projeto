@@ -105,12 +105,13 @@ class EstrategiaDQN:
         self._build_networks(input_size, output_size, hidden)
         rewards_history = []
         paths = []
+        start = [0,0]
         for ep in range(self.episodes):
             if hasattr(ambiente, "reset"):
                 ambiente.reset()
 
             agent = AgenteAprendizagem()
-            agent.pos = ambiente.posicao_aleatoria()
+            agent.pos = start
             ambiente.posicoes[agent] = tuple(agent.pos)
             agent.found_goal = False
             obs = ambiente.observacao_para(agent)
@@ -134,14 +135,23 @@ class EstrategiaDQN:
                 obs_next = ambiente.observacao_para(agent)
                 agent.observacao(obs_next)
                 next_state = agent.build_nn_input(obs_next)
-                done = getattr(agent, "found_goal", False)
-                self.memory.append((state, action_idx, float(reward), next_state, done))
-                self.optimize_model()
+                state = state.astype(np.float32)
+                next_state = next_state.astype(np.float32)
+                done_flag = False
+                if ambiente.nome == "AmbienteFarol":
+                    done_flag = bool(getattr(agent, "found_goal", False) or (ambiente.posicoes.get(agent) == getattr(ambiente, "pos_farol", None)))
+                elif ambiente.nome == "AmbienteForaging":
+                    done_flag = ambiente.terminou([agent])
+                self.memory.append((state, action_idx, float(reward), next_state, done_flag))
+                warmup = max(self.batch_size * 2, 1000)
+                if len(self.memory) >= warmup:
+                    self.optimize_model()
+
                 state = next_state
                 ep_reward += float(reward)
                 path.append(tuple(agent.pos))
 
-                if done:
+                if done_flag:
                     break
 
             self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)

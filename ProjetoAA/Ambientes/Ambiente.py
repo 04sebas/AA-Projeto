@@ -7,12 +7,13 @@ from ProjetoAA.Objetos.Observacao import Observacao
 
 
 class Ambiente(ABC):
-    def __init__(self, largura, altura, recursos=None, obstaculos=None):
+    def __init__(self, largura, altura, recursos=None, obstaculos=None,nome="Ambiente"):
         self.largura = largura
         self.altura = altura
         self.recursos = recursos or []
         self.obstaculos = obstaculos or []
         self.posicoes = {}
+        self.nome = nome
         self.tempo = 0
 
 

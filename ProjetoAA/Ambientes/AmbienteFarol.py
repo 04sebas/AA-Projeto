@@ -24,7 +24,8 @@ class AmbienteFarol(Ambiente):
             largura=self.largura,
             altura=self.altura,
             recursos=self.recursos,
-            obstaculos=self.obstaculos
+            obstaculos=self.obstaculos,
+            nome="AmbienteFarol"
         )
 
         self.posicoes = {}
