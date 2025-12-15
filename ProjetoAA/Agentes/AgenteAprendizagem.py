@@ -1,4 +1,5 @@
 import math
+import random
 
 import numpy as np
 
@@ -22,7 +23,7 @@ class AgenteAprendizagem(Agente):
         self.trainable = True
 
         if nomes_accao is None:
-            self.nomes_accao = ["cima", "baixo", "direita", "esquerda"]
+            self.nomes_accao = ["cima", "baixo", "direita", "esquerda","recolher", "depositar"]
         else:
             self.nomes_accao = list(nomes_accao)
 
@@ -46,7 +47,7 @@ class AgenteAprendizagem(Agente):
             pos_t = tuple(p.get("pos"))
 
             if tipo in ("recurso", "farol"):
-                quantidade = p.get("quantidade", p.get("valor", 1))
+                quantidade = p.get("quantidade", 0)
                 if quantidade and quantidade > 0:
                     self.resources.add(pos_t)
                 else:
@@ -61,8 +62,7 @@ class AgenteAprendizagem(Agente):
                     self.comunica("foraging", de_agente)
 
         if pos_atual in self.resources:
-            if not any(tuple(p.get("pos")) == pos_atual and p.get("tipo") in ("recurso", "farol")
-                       for p in percepcoes):
+            if not any(tuple(p.get("pos")) == pos_atual and p.get("tipo") in ("recurso", "farol") for p in percepcoes):
                 self.resources.discard(pos_atual)
 
     def cria(self, ficheiro_parametros):
@@ -70,7 +70,7 @@ class AgenteAprendizagem(Agente):
 
     def age(self):
         if self.neural_network is None or self.ultima_obs is None:
-            return Accao("ficar")
+            return Accao(random.choice(self.nomes_accao[:4]))
 
         obs = self.ultima_obs
         px, py = obs.posicao
@@ -94,6 +94,16 @@ class AgenteAprendizagem(Agente):
         if agentes_visiveis:
             for de_ag in agentes_visiveis:
                 self.comunica("foraging", de_ag)
+
+        if getattr(obs, "carga", 0) == 0:
+            recursos_visiveis = [tuple(p.get("pos")) for p in percepcoes if p.get("tipo") in ("recurso", "farol")]
+            if recursos_visiveis:
+                target = min(recursos_visiveis, key=lambda pos: abs(pos[0] - px) + abs(pos[1] - py))
+                return Accao(self.__move_toward_action(target, (px, py)))
+
+        goal = getattr(obs, "goal", None)
+        if goal is None:
+            return Accao(random.choice(self.nomes_accao[:4]))
 
         nn_input = self.build_nn_input(self.ultima_obs)
 
@@ -158,7 +168,7 @@ class AgenteAprendizagem(Agente):
                         features.append(-0.9)
                     elif tipo in ("recurso", "farol"):
                         if getattr(obs, "carga", 0) <= 0:
-                            features.append(0.8)
+                            features.append(0.9)
                         else:
                             features.append(0.1)
                     elif tipo == "ninho":
@@ -172,9 +182,9 @@ class AgenteAprendizagem(Agente):
                     if gx is not None and gy is not None:
                         dist_cell = math.sqrt((pos_check[0] - gx) ** 2 + (pos_check[1] - gy) ** 2)
                         if dist_cell < dist_current:
-                            features.append(0.5)
+                            features.append(0.9)
                         else:
-                            features.append(-0.1)
+                            features.append(-0.9)
                     else:
                         features.append(-0.9)
 
@@ -183,21 +193,23 @@ class AgenteAprendizagem(Agente):
     def build_nn_input(self, obs):
         px, py = obs.posicao
         features = np.array(self.surroundings(), dtype=np.float32)
+
         largura = max(1.0, getattr(obs, "largura", 1))
         altura = max(1.0, getattr(obs, "altura", 1))
+
         norm_x = px / largura
         norm_y = py / altura
 
         goal = getattr(obs, "goal", None)
         if goal is not None:
             gx, gy = goal
-            goal_x = (gx - px) / max(1.0, largura)
-            goal_y = (gy - py) / max(1.0, altura)
+            goal_x = (gx - px) / largura
+            goal_y = (gy - py) / altura
         else:
             goal_x = 0.0
             goal_y = 0.0
 
-        carrying = float(obs.carga > 0)
+        carrying = float(getattr(obs, "carga", 0) > 0)
 
         return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y, carrying])).astype(np.float32)
 
@@ -222,11 +234,12 @@ class AgenteAprendizagem(Agente):
                 return "esquerda"
         else:
             if dy > 0:
-                return "cima"
-            elif dy < 0:
                 return "baixo"
+            elif dy < 0:
+                return "cima"
 
         return "ficar"
+
 
 
 

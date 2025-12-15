@@ -1,42 +1,59 @@
 {
   "simulador": {
-    "max_passos": 1500,
+    "max_passos": 2000,
     "visualizacao": true
   },
 
   "ambiente": {
-    "tipo": "AmbienteFarol",
-    "largura": 100,
-    "altura": 100,
-    "pos_farol": [50, 75],
+    "tipo": "AmbienteForaging",
+    "largura": 50,
+    "altura": 50,
+    "recursos": [
+      { "pos": [5, 5], "quantidade": 2, "valor": 100 },
+      { "pos": [10, 10], "quantidade": 2, "valor": 150 },
+      { "pos": [15, 8], "quantidade": 4, "valor": 50 },
+      { "pos": [20, 15], "quantidade": 1, "valor": 250 },
+      { "pos": [25, 20], "quantidade": 4, "valor": 100 },
+      { "pos": [30, 25], "quantidade": 1, "valor": 200 },
+      { "pos": [35, 40], "quantidade": 3, "valor": 50 },
+      { "pos": [40, 10], "quantidade": 2, "valor": 150 },
+      { "pos": [45, 30], "quantidade": 3, "valor": 100 },
+      { "pos": [12, 35], "quantidade": 2, "valor": 200 }
+    ],
+    "ninhos": [
+      [2, 2],
+      [47, 47],
+      [5, 45],
+      [45, 5],
+      [25,25]
+    ],
     "obstaculos": []
   },
+
   "agentes": [
     {
       "tipo": "AgenteFixo",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": [[5, 5]],
       "trainable": false,
       "politica": {
         "tipo": "greedy",
-        "alcance": 8
+        "alcance": 3
       }
     },
-
     {
       "tipo": "AgenteFixo",
       "quantidade": 0,
-      "posicao_inicial": [10, 10],
+      "posicao_inicial": "random",
       "trainable": false,
       "politica": {
         "tipo": "random",
         "alcance": 3
       }
     },
-
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",
@@ -50,14 +67,13 @@
         "tamanho_torneio": 3,
         "elitismo_frac": 0.2,
         "hidden": [16, 8],
-        "passos_por_avaliacao": 500,
+        "passos_por_avaliacao": 1500,
         "mutation_std": 0.1
       }
     },
-
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": [[0,0]],
       "trainable": true,
       "tipo_estrategia": "dqn",
@@ -66,10 +82,10 @@
       },
       "estrategia_conf": {
         "hidden": [16, 8],
-        "episodes": 100,
-        "passos_por_ep": 500,
+        "episodes": 50,
+        "passos_por_ep": 1500,
         "gamma": 0.99,
-        "epsilon": 1.0,
+        "epsilon": 0.7,
         "epsilon_min": 0.1,
         "epsilon_decay": 0.985,
         "batch_size": 32,
@@ -83,16 +99,15 @@
   "estrategia": [
     {
       "tipo": "genetica",
-      "populacao_tamanho": 100,
+      "populacao_tamanho": 60,
       "taxa_mutacao": 0.02,
-      "num_ger": 50,
+      "num_ger": 30,
       "tamanho_torneio": 3,
       "elitismo_frac": 0.1,
-      "hidden": [16, 8],
-      "passos_por_avaliacao": 500,
+      "hidden": [32, 16],
+      "passos_por_avaliacao": 800,
       "mutation_std": 0.05
     },
-
     {
       "tipo": "dqn",
       "hidden": [32, 16],
@@ -101,7 +116,7 @@
       "gamma": 0.99,
       "epsilon": 1.0,
       "epsilon_min": 0.1,
-      "epsilon_decay": 0.990,
+      "epsilon_decay": 0.995,
       "batch_size": 64,
       "target_update_freq": 50,
       "memory_size": 20000,

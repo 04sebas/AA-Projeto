@@ -7,10 +7,10 @@ from ProjetoAA.Objetos.Sensor import Sensor
 
 
 class AgenteFixo(Agente):
-    def __init__(self, posicao=None, politica=None):
+    def __init__(self, posicao=None, politica=None, nome="AF"):
         if posicao is None:
             posicao = [0, 0]
-        super().__init__(posicao, "AF")
+        super().__init__(posicao, nome)
         politica = politica or {}
         alcance = politica.get("alcance", 5)
         self.found_goal = False

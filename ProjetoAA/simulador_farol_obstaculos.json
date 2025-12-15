@@ -215,7 +215,7 @@
       },
       "estrategia_conf": {
         "hidden": [16, 8],
-        "episodes": 50,
+        "episodes": 100,
         "passos_por_ep": 500,
         "gamma": 0.99,
         "epsilon": 1.0,

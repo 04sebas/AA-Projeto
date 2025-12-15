@@ -125,7 +125,13 @@ class EstrategiaGenetica:
                     fitness += float(reward)
                     agent.path.append(agent.pos)
 
-                    if getattr(agent, "found_goal", False):
+                    done_flag = False
+                    if ambiente.nome == "AmbienteFarol":
+                        done_flag = bool(getattr(agent, "found_goal", False) or (ambiente.posicoes.get(agent) == getattr(ambiente, "pos_farol", None)))
+                    elif ambiente.nome == "AmbienteForaging":
+                        done_flag = ambiente.terminou([agent])
+
+                    if done_flag:
                         break
 
                 self.fitness[i] = fitness
