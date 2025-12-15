@@ -16,7 +16,7 @@ class AgenteAprendizagem(Agente):
             posicao = [0, 0]
         super().__init__(posicao, nome)
         politica = politica or {}
-        alcance = politica.get("alcance", 3)
+        alcance = politica.get("alcance", 1)
         self.sensores = Sensor(alcance=alcance)
         self.ultima_obs = None
         self.politica = politica
@@ -214,7 +214,7 @@ class AgenteAprendizagem(Agente):
         return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y, carrying])).astype(np.float32)
 
     def get_input_size(self):
-        alcance = getattr(self.sensores, "alcance", 3)
+        alcance = self.sensores.alcance
         num_features = (2 * alcance + 1) ** 2 - 1
         return int(num_features + 5)
 

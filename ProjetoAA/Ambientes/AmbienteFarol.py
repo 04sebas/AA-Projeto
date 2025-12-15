@@ -1,24 +1,26 @@
-import math
 from ProjetoAA.Ambientes.Ambiente import Ambiente
 from ProjetoAA.Objetos.Observacao import Observacao
+from ProjetoAA.Aprendizagem.Politicas import DIRECOES
 
 class AmbienteFarol(Ambiente):
     def __init__(self, largura=100, altura=100, pos_farol=(50,75), obstaculos=None):
         self.largura = int(largura)
         self.altura = int(altura)
-        self.pos_farol = tuple(pos_farol)
+        self.pos_farol = (int(pos_farol[0]), int(pos_farol[1]))
 
-        self.obstaculos = set()
-        self.obstaculos_raw = []
+        parsed_obst = set()
         for o in (obstaculos or []):
-            pos = o.get("pos") if isinstance(o, dict) else None
-            if pos is None:
-                continue
-            tup = (int(pos[0]), int(pos[1]))
-            self.obstaculos.add(tup)
-            self.obstaculos_raw.append({"pos": [tup[0], tup[1]]})
+            if isinstance(o, dict) and "pos" in o:
+                parsed_obst.add((int(o["pos"][0]), int(o["pos"][1])))
+            elif isinstance(o, (list, tuple)) and len(o) >= 2:
+                parsed_obst.add((int(o[0]), int(o[1])))
+        if self.pos_farol in parsed_obst:
+            parsed_obst.discard(self.pos_farol)
 
-        self.recursos = {tuple(self.pos_farol): {"tipo": "farol", "pos": list(self.pos_farol), "valor": 1500, "quantidade": 1}}
+        self.obstaculos = parsed_obst
+        self.obstaculos_raw = [{"pos": [p[0], p[1]]} for p in self.obstaculos]
+
+        self.recursos = {self.pos_farol: {"tipo": "farol", "pos": list(self.pos_farol), "valor": 1500, "quantidade": 1}}
 
         super().__init__(
             largura=self.largura,
@@ -29,53 +31,52 @@ class AmbienteFarol(Ambiente):
         )
 
         self.posicoes = {}
+        self.targets = {}
         self.tempo = 0
 
     def observacao_para(self, agente):
-        pos = tuple(self.posicoes.get(agente, (0,0)))
-        percepcoes = agente.sensores.perceber(self, pos)
+        pos = tuple(self.posicoes.get(agente, (0, 0)))
+        percepcoes = agente.sensores.perceber(self, pos) or []
+
+        if pos == self.pos_farol:
+            percepcoes.append({
+                "tipo": "farol",
+                "pos": pos
+            })
 
         obs = Observacao(percepcoes)
         obs.posicao = pos
         obs.largura = self.largura
         obs.altura = self.altura
         agente.ultima_obs = obs
+        obs.carga = 0
+
         obs.goal = self.pos_farol
         obs.foraging = False
 
         return obs
 
     def agir(self, accao, agente):
-        pos = list(self.posicoes.get(agente, (0, 0)))
-        x, y = pos
+        if getattr(agente, "found_goal", False):
+            return 0.0
+        raw_pos = self.posicoes.get(agente, (0, 0))
+        x, y = int(raw_pos[0]), int(raw_pos[1])
 
         if (x, y) == self.pos_farol:
             recurso = self.recursos.get((x, y))
             if recurso is not None:
-                valor = recurso.get("valor", 1500)
+                valor = float(recurso.get("valor", 1500))
                 agente.found_goal = True
-                return float(valor)
-            else:
-                return -0.1
+                return valor
 
         if accao.nome == "recolher":
-            return -0.1
-        elif accao.nome == "cima":
-            dx, dy = (0, 1)
-        elif accao.nome == "baixo":
-            dx, dy = (0, -1)
-        elif accao.nome == "esquerda":
-            dx, dy = (-1, 0)
-        elif accao.nome == "direita":
-            dx, dy = (1, 0)
-        else:
-            dx, dy = (0, 0)
+            return -0.5
 
-        newx, newy = x + dx, y + dy
+        dx, dy = DIRECOES.get(accao.nome, (0, 0))
+        newx, newy = x + int(dx), y + int(dy)
 
         if not (0 <= newx < self.largura and 0 <= newy < self.altura):
             return -1
-
         if (newx, newy) in self.obstaculos:
             return -1
 
@@ -90,10 +91,18 @@ class AmbienteFarol(Ambiente):
         if (newx, newy) == (x, y):
             reward -= 0.2
 
-        if new_dist < prev_dist:
+        if new_dist is not None and prev_dist is not None and new_dist < prev_dist:
             reward += 1.0
 
         return reward
+
+    def distance_to_goal(self, x, y):
+        dx = abs(int(x) - self.pos_farol[0])
+        dy = abs(int(y) - self.pos_farol[1])
+        dist = dx + dy
+        max_dist = float(self.largura + self.altura) or 1.0
+        return dist / max_dist
+
 
     def atualizacao(self):
         self.tempo += 1
@@ -102,12 +111,10 @@ class AmbienteFarol(Ambiente):
         self.posicoes = {}
         self.tempo = 0
 
-    def distance_to_goal(self, x, y):
-        dx = x - self.pos_farol[0]
-        dy = y - self.pos_farol[1]
-        dist = math.sqrt(dx * dx + dy * dy)
-        max_dist = math.sqrt(self.largura * self.largura + self.altura * self.altura)
-        return dist / max_dist
+    def terminou(self, agentes=None):
+        return all(getattr(a, "found_goal", False) for a in agentes)
+
+
 
 
 
