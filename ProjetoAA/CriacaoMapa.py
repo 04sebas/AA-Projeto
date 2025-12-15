@@ -58,5 +58,5 @@ mapa = {
     ]
 }
 
-with open("simulacao_foraging.json", "w") as f:
+with open("simulador_foraging.json", "w") as f:
     json.dump(mapa, f, indent=4)

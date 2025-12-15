@@ -10,19 +10,41 @@ from ProjetoAA.Aprendizagem.EstrategiaGenetica import EstrategiaGenetica
 from ProjetoAA.Aprendizagem.EstrategiaQLearning import EstrategiaDQN
 
 
-def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_dir="models"):
-    import os, pickle
+def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_dir="models", tipo="genetica"):
+    import os, pickle, re, time
 
     os.makedirs(out_dir, exist_ok=True)
 
     env_name = getattr(ambiente, "nome", type(ambiente).__name__)
-    filename = f"{env_name}_agente{agent_index}_nn.pkl"
+    base_prefix = f"{env_name}_agente{agent_index}_{tipo}"
+
+    pattern = re.compile(rf"^{re.escape(base_prefix)}(?:_v(\d+))?\.pkl$")
+    max_v = 0
+    for fn in os.listdir(out_dir):
+        m = pattern.match(fn)
+        if m:
+            if m.group(1):
+                try:
+                    v = int(m.group(1))
+                    if v > max_v:
+                        max_v = v
+                except Exception:
+                    pass
+            else:
+                if max_v < 1:
+                    max_v = 1
+
+    next_v = max_v + 1 if max_v > 0 else 1
+    filename = f"{base_prefix}_v{next_v}.pkl"
+
     path = os.path.join(out_dir, filename)
 
     meta = {
         "env_name": env_name,
         "agent_index": agent_index,
         "nn_arch": nn_arch if nn_arch is not None else getattr(nn_obj, "arch", None),
+        "tipo": tipo,
+        "timestamp": int(time.time()),
     }
 
     data = {
@@ -37,8 +59,24 @@ def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_
     with open(path, "wb") as f:
         pickle.dump(data, f)
 
-    print(f"[SALVO] NN guardada em {path}")
+    print(f"[SALVO] NN (tipo={tipo}) guardada em {path}")
     return path, meta
+
+def _to_offsets(offsets):
+    arr = np.asarray(offsets, dtype=float)
+    if arr.size == 0:
+        return np.empty((0, 2), dtype=float)
+    if arr.ndim == 1 and arr.shape[0] == 2:
+        return arr.reshape(1, 2)
+    if arr.ndim == 1 and arr.shape[0] % 2 == 0:
+        return arr.reshape(-1, 2)
+    if arr.ndim == 2 and arr.shape[1] == 2:
+        return arr
+    try:
+        return arr.reshape(-1, 2)
+    except Exception:
+        return np.empty((0, 2), dtype=float)
+
 
 class MotorDeSimulacao:
     def __init__(self):
@@ -124,12 +162,24 @@ class MotorDeSimulacao:
                 if isinstance(pos, list):
                     pos = tuple(pos)
                 if tipo == "AgenteFixo":
-                    agente = AgenteFixo(posicao=list(pos), politica=config.get("politica", {}))
+                    agente = AgenteFixo(
+                        posicao=list(pos),
+                        politica=config.get("politica", {}),
+                        nome=f"AgenteFixo_{i}"
+                    )
                 elif tipo == "AgenteAprendizagem":
-                    tipo_estrategia = config.get("tipo_estrategia", config.get("estrategia", {}).get("nome", "qlearning"))
-                    agente = AgenteAprendizagem(nome=f"Aprendiz_{i}", politica=config.get("politica", {}), posicao=pos)
+                    politica_agente = config.get("politica", {})
+                    tipo_estrategia = config.get("tipo_estrategia", "genetica")
+
+                    agente = AgenteAprendizagem(
+                        nome=f"Agente Aprendizagem {tipo_estrategia}",
+                        politica=politica_agente,
+                        posicao=list(pos)
+                    )
+
+                    agente.trainable = bool(config.get("trainable", False))
                     agente.tipo_estrategia = tipo_estrategia
-                    agente.estrategia_conf = config.get("estrategia", config.get("estrategia_conf", {}))
+                    agente.estrategia_conf = config.get("estrategia_conf", {})
                 else:
                     raise ValueError(f"Tipo de agente desconhecido: {tipo}")
 
@@ -151,22 +201,123 @@ class MotorDeSimulacao:
         with open(fullpath, "rb") as f:
             data = pickle.load(f)
 
-        meta = data["meta"]
-        nn_arch = meta["nn_arch"]
+        meta = data.get("meta", {})
+        nn_arch = meta.get("nn_arch")
+        tipo = meta.get("tipo", "unknown")
 
-        input_size, output_size, hidden_arch = nn_arch
+        nn_obj = None
+        try:
+            if nn_arch:
+                input_size, output_size, hidden_arch = nn_arch
+                nn_obj = RedeNeuronal(input_size, output_size, hidden_arch, relu, output_fn)
+                if data.get("hidden_weights") is not None:
+                    nn_obj.hidden_weights = data.get("hidden_weights")
+                if data.get("hidden_biases") is not None:
+                    nn_obj.hidden_biases = data.get("hidden_biases")
+                if data.get("output_weights") is not None:
+                    nn_obj.output_weights = data.get("output_weights")
+                if data.get("output_bias") is not None:
+                    nn_obj.output_bias = data.get("output_bias")
 
-        nn = RedeNeuronal(input_size, output_size, hidden_arch, relu, output_fn)
+                if hasattr(nn_obj, "weights") and data.get("weights_flat") is not None:
+                    try:
+                        nn_obj.weights = data.get("weights_flat")
+                    except Exception:
+                        pass
 
-        nn.hidden_weights = data.get("hidden_weights")
-        nn.hidden_biases = data.get("hidden_biases")
-        nn.output_weights = data.get("output_weights")
-        nn.output_bias = data.get("output_bias")
+        except Exception as e:
+            print(f"[LOAD] Aviso: não foi possível reconstruir a RedeNeuronal a partir do meta.nn_arch: {e}")
+            nn_obj = None
 
-        self.agentes[agente_idx].neural_network = nn
-        self.agentes[agente_idx].weights = data.get("weights_flat")
+        agente = self.agentes[agente_idx]
 
-        print(f"[LOAD] NN carregada para o agente {agente_idx}")
+        if nn_obj is not None:
+            agente.neural_network = nn_obj
+            agente.weights = data.get("weights_flat")
+            print(f"[LOAD] NN reconstruída e atribuída ao agente {agente_idx} (tipo={tipo})")
+            return
+
+        agente.weights = data.get("weights_flat")
+        try:
+            nn_existing = getattr(agente, "neural_network", None)
+            if nn_existing is not None:
+                if data.get("hidden_weights") is not None:
+                    setattr(nn_existing, "hidden_weights", data.get("hidden_weights"))
+                if data.get("hidden_biases") is not None:
+                    setattr(nn_existing, "hidden_biases", data.get("hidden_biases"))
+                if data.get("output_weights") is not None:
+                    setattr(nn_existing, "output_weights", data.get("output_weights"))
+                if data.get("output_bias") is not None:
+                    setattr(nn_existing, "output_bias", data.get("output_bias"))
+                print(f"[LOAD] Pesos atribuídos à neural_network existente do agente {agente_idx}")
+                return
+        except Exception:
+            pass
+
+        print(f"[LOAD] Apenas weights_flat carregados para agente {agente_idx} (tipo={tipo}).")
+
+    def load_networks(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
+        summary = {}
+
+        if agents is None:
+            agents = list(range(len(self.agentes)))
+
+        file_map = file_map or {}
+
+        for idx in agents:
+            if idx < 0 or idx >= len(self.agentes):
+                summary[idx] = {"status": "error", "msg": "Índice de agente inválido"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Índice inválido: {idx}")
+                continue
+
+            agente = self.agentes[idx]
+
+            if not getattr(agente, "trainable", False):
+                summary[idx] = {"status": "skipped", "msg": "agente não treinável"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Agente {idx} (não treinável) - skip")
+                continue
+
+            filepath = None
+            if idx in file_map:
+                filepath = file_map[idx]
+            elif pattern is not None:
+                try:
+                    filepath = pattern.format(idx=idx)
+                except Exception as e:
+                    summary[idx] = {"status": "error", "msg": f"Erro a formatar pattern: {e}"}
+                    if verbose:
+                        print(f"[LOAD_NETWORKS] Erro a formatar pattern para agente {idx}: {e}")
+                    continue
+            else:
+                summary[idx] = {"status": "skipped", "msg": "nenhum pattern nem file_map fornecido"}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Agente {idx} - nenhum ficheiro especificado")
+                continue
+
+            try:
+                self.carregar_rede(filepath, idx)
+                summary[idx] = {"status": "loaded", "msg": filepath}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Sucesso: agente {idx} <- {filepath}")
+            except FileNotFoundError:
+                summary[idx] = {"status": "missing", "msg": filepath}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Ficheiro não encontrado para agente {idx}: {filepath}")
+            except Exception as e:
+                summary[idx] = {"status": "error", "msg": str(e)}
+                if verbose:
+                    print(f"[LOAD_NETWORKS] Erro ao carregar agente {idx} de {filepath}: {e}")
+
+        return summary
+
+    def autoload_if_flag(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
+        if getattr(self, "autoload_models", False):
+            return self.load_networks(pattern=pattern, file_map=file_map, agents=agents, verbose=verbose)
+        if verbose:
+            print("[autoload_if_flag] autoload_models não activado; nenhum ficheiro carregado.")
+        return {}
 
     def fase_treino(self):
         saved_files = {}
@@ -197,7 +348,7 @@ class MotorDeSimulacao:
                 input_size = agente.get_input_size()
             except Exception:
                 alcance = getattr(agente.sensores, "alcance", 3)
-                input_size = (2 * alcance + 1) ** 2 - 1 + 3
+                input_size = (2 * alcance + 1) ** 2 - 1 + 5
 
             output_size = len(available_actions)
 
@@ -215,7 +366,7 @@ class MotorDeSimulacao:
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = ga.run(self.ambiente, verbose=True)
+                best_weights, best_nn = ga.run(self.ambiente, verbose=True,input_size=input_size)
 
                 self.ambiente.reset()
 
@@ -227,8 +378,10 @@ class MotorDeSimulacao:
                     idx,
                     best_weights,
                     best_nn,
-                    nn_arch=getattr(ga, "nn_arch", None)
+                    nn_arch=getattr(ga, "nn_arch", None),
+                    tipo="genetica"
                 )
+
                 meta = dict(meta or {})
                 meta["tipo"] = "genetica"
                 saved_files[idx] = {"path": path, "meta": meta}
@@ -252,7 +405,7 @@ class MotorDeSimulacao:
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = dqn.run(self.ambiente, verbose=True)
+                best_weights, best_nn = dqn.run(self.ambiente, verbose=True,alcance=agente.sensores.alcance)
 
                 self.ambiente.reset()
 
@@ -264,7 +417,8 @@ class MotorDeSimulacao:
                     idx,
                     best_weights,
                     best_nn,
-                    nn_arch=getattr(dqn, "nn_arch", None)
+                    nn_arch=getattr(dqn, "nn_arch", None),
+                    tipo="dqn"
                 )
                 meta = dict(meta or {})
                 meta["tipo"] = "dqn"
@@ -327,6 +481,8 @@ class MotorDeSimulacao:
 
             if isinstance(self.ambiente, AmbienteFarol):
                 todos_terminaram = all(getattr(ag, "found_goal", False) for ag in self.agentes)
+            elif isinstance(self.ambiente, AmbienteForaging):
+                todos_terminaram = self.ambiente.terminou(self.agentes)
 
             if todos_terminaram:
                 print(f"Simulação terminada no passo {passo}!")
@@ -334,6 +490,7 @@ class MotorDeSimulacao:
 
         if self.visualizacao:
             try:
+                self.plot_estatisticas_teste()
                 self.visualizar_caminhos()
             except Exception as e:
                 print(f"Erro ao desenhar visualizações: {e}")
@@ -427,21 +584,123 @@ class MotorDeSimulacao:
         plt.tight_layout()
         plt.show()
 
+    def plot_estatisticas_teste(self):
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        agentes = self.agentes
+        nomes = [getattr(ag, "nome", f"Agente_{i}") for i, ag in enumerate(agentes)]
+
+        recolhidos = [getattr(ag, "recursos_recolhidos", 0) for ag in agentes]
+        depositados = [getattr(ag, "recursos_depositados", 0) for ag in agentes]
+        fitnesses = [getattr(ag, "recompensa_total", 0.0) for ag in agentes]
+
+        x = np.arange(len(nomes))
+        width = 0.35
+
+        plt.figure(figsize=(10, 5))
+        plt.bar(x - width / 2, recolhidos, width, label="Recolhidos")
+        plt.bar(x + width / 2, depositados, width, label="Depositados")
+        plt.xticks(x, nomes, rotation=45, ha="right")
+        plt.ylabel("Quantidade")
+        plt.title("Recursos Recolhidos e Depositados por Agente (Teste)")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(10, 5))
+        plt.bar(x, fitnesses, width * 1.2)
+        plt.xticks(x, nomes, rotation=45, ha="right")
+        plt.ylabel("Fitness (Recompensa Total)")
+        plt.title("Fitness dos Agentes na Fase de Teste")
+        plt.tight_layout()
+        plt.show()
+
+        print("\nResumo da Fase de Teste:")
+        print(f"{'Agente':20s} {'Recolhidos':>10s} {'Depositados':>12s} {'Fitness':>12s}")
+        for nome, r, d, f in zip(nomes, recolhidos, depositados, fitnesses):
+            print(f"{nome:20s} {r:10d} {d:12d} {f:12.2f}")
+
+    def salvar_animacao_gif(self, filepath, fps=10, trail_len=20):
+        import matplotlib.animation as animation
+        from matplotlib.animation import PillowWriter
+
+        if not self.historico_agentes:
+            raise RuntimeError("historico_agentes vazio")
+
+        agentes = list(self.historico_agentes.keys())
+        paths = [self.historico_agentes[ag] for ag in agentes]
+        max_steps = max(len(p) for p in paths)
+
+        fig, ax = plt.subplots(figsize=(8, 8))
+        largura, altura = self.ambiente.largura, self.ambiente.altura
+        ax.set_xlim(-0.5, largura - 0.5)
+        ax.set_ylim(-0.5, altura - 0.5)
+        ax.set_aspect("equal")
+        ax.grid(True)
+
+        recursos = getattr(self.ambiente, "recursos", {})
+        if isinstance(recursos, dict):
+            for (x, y), info in recursos.items():
+                ax.scatter(x, y, s=80, color="gold", edgecolors="k")
+
+        ninhos = getattr(self.ambiente, "ninhos", [])
+        if ninhos:
+            nx, ny = zip(*ninhos)
+            ax.scatter(nx, ny, s=160, marker="^", color="blue", edgecolors="k")
+
+        colors = plt.cm.tab20(np.linspace(0, 1, len(agentes)))
+        agents_scatter = []
+        trails = []
+
+        for c in colors:
+            sc = ax.scatter([], [], s=80, color=c, edgecolors="k")
+            ln, = ax.plot([], [], linewidth=1.5, color=c, alpha=0.7)
+            agents_scatter.append(sc)
+            trails.append(ln)
+
+        def update(frame):
+            for i, path in enumerate(paths):
+                if frame < len(path):
+                    agents_scatter[i].set_offsets([path[frame]])
+                else:
+                    agents_scatter[i].set_offsets([])
+
+                start = max(0, frame - trail_len)
+                seg = path[start:frame + 1]
+                if len(seg) > 1:
+                    xs, ys = zip(*seg)
+                    trails[i].set_data(xs, ys)
+                else:
+                    trails[i].set_data([], [])
+
+            ax.set_title(f"Step {frame}")
+            return agents_scatter + trails
+
+        ani = animation.FuncAnimation(
+            fig,
+            update,
+            frames=max_steps,
+            interval=1000 // fps,
+            blit=False
+        )
+
+        ani.save(filepath, writer=PillowWriter(fps=fps))
+        plt.close(fig)
+
+        print(f"[GIF] Animação salva em {filepath}")
+
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulacao_foraging.json")
+    simulador = MotorDeSimulacao().cria("simulador_farol_vazio.json")
     if simulador.ativo:
-        """""
-        for idx, agente in enumerate(simulador.agentes):
-            if not isinstance(agente, AgenteAprendizagem):
-                continue
-            if not getattr(agente, "trainable", False):
-                continue
+        file_map = {
+            1: "models/AmbienteFarol_agente1_genetica_v5.pkl"
+        }
+        #resumo = simulador.load_networks(file_map=file_map, agents=[1])
+        #print(resumo)
 
-            try:
-                simulador.carregar_rede(f"models/AmbienteFarol_agente0_nn.pkl",idx)
-            except FileNotFoundError:
-                print(f"[LOAD] NN não encontrada para agente {idx}, será usado aleatório.")
-                """""
         simulador.fase_treino()
         simulador.fase_teste()
+        #simulador.salvar_animacao_gif("models/trajetorias_foraging.gif", fps=12, trail_len=30)
+

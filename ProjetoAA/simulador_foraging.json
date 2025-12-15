@@ -1,0 +1,135 @@
+{
+  "simulador": {
+    "max_passos": 2000,
+    "visualizacao": true
+  },
+
+  "ambiente": {
+    "tipo": "AmbienteForaging",
+    "largura": 50,
+    "altura": 50,
+    "recursos": [
+      { "pos": [26, 8], "quantidade": 1, "valor": 100 },
+      { "pos": [15, 12], "quantidade": 1, "valor": 100 },
+      { "pos": [4, 16], "quantidade": 1, "valor": 100 },
+      { "pos": [19, 20], "quantidade": 1, "valor": 100 },
+      { "pos": [29, 24], "quantidade": 1, "valor": 100 },
+      { "pos": [15, 29], "quantidade": 1, "valor": 100 },
+      { "pos": [4, 33], "quantidade": 1, "valor": 100 },
+      { "pos": [11, 35], "quantidade": 1, "valor": 100 },
+      { "pos": [36, 36], "quantidade": 1, "valor": 100 },
+      { "pos": [20, 39], "quantidade": 1, "valor": 100 },
+      { "pos": [9, 41], "quantidade": 1, "valor": 100 },
+      { "pos": [23, 44], "quantidade": 1, "valor": 100 },
+      { "pos": [27, 49], "quantidade": 1, "valor": 100 }
+    ],
+    "ninhos": [
+      [3, 1],
+      [22, 8],
+      [46, 12],
+      [22, 17],
+      [4, 33],
+      [37, 41],
+      [16, 45],
+      [32, 50]
+    ],
+    "obstaculos": [
+      { "pos": [46, 1] },
+      { "pos": [46, 2] },
+      { "pos": [46, 3] },
+      { "pos": [24, 4] },
+      { "pos": [24, 5] },
+      { "pos": [24, 6] },
+      { "pos": [24, 7] },
+      { "pos": [24, 8] },
+      { "pos": [24, 9] },
+      { "pos": [24, 10] },
+      { "pos": [24, 11] },
+      { "pos": [24, 12] },
+      { "pos": [25, 13] },
+      { "pos": [0, 14] },
+      { "pos": [24, 14] },
+      { "pos": [0, 15] },
+      { "pos": [0, 16] },
+      { "pos": [0, 17] },
+      { "pos": [0, 18] },
+      { "pos": [1, 19] },
+      { "pos": [2, 20] },
+      { "pos": [3, 21] },
+      { "pos": [4, 22] },
+      { "pos": [5, 23] },
+      { "pos": [6, 24] },
+      { "pos": [7, 25] },
+      { "pos": [8, 26] },
+      { "pos": [9, 27] },
+      { "pos": [10, 28] },
+      { "pos": [11, 29] }
+    ]
+  },
+
+  "agentes": [
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 2,
+      "posicao_inicial": [[49,49],[45,0]],
+      "trainable": false,
+      "politica": {
+        "tipo": "greedy",
+        "alcance": 3
+      }
+    },
+    {
+      "tipo": "AgenteFixo",
+      "quantidade": 0,
+      "posicao_inicial": "random",
+      "trainable": false,
+      "politica": {
+        "tipo": "random",
+        "alcance": 3
+      }
+    },
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 1,
+      "posicao_inicial": [[0,45]],
+      "trainable": true,
+      "tipo_estrategia": "genetica",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia_conf": {
+        "populacao_tamanho": 100,
+        "taxa_mutacao": 0.01,
+        "num_ger": 50,
+        "tamanho_torneio": 3,
+        "elitismo_frac": 0.2,
+        "hidden": [16, 8],
+        "passos_por_avaliacao": 1500,
+        "mutation_std": 0.1
+      }
+    },
+    {
+      "tipo": "AgenteAprendizagem",
+      "quantidade": 0,
+      "posicao_inicial": [[0,0]],
+      "trainable": true,
+      "tipo_estrategia": "dqn",
+      "politica": {
+        "alcance": 3
+      },
+      "estrategia_conf": {
+        "hidden": [16, 8],
+        "episodes": 100,
+        "passos_por_ep": 1500,
+        "gamma": 0.99,
+        "epsilon": 0.7,
+        "epsilon_min": 0.1,
+        "epsilon_decay": 0.985,
+        "batch_size": 32,
+        "target_update_freq": 50,
+        "memory_size": 50000,
+        "learning_rate": 0.001
+      }
+    }
+  ]
+}
