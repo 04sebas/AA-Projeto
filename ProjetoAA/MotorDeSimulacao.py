@@ -692,7 +692,7 @@ class MotorDeSimulacao:
 
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulador_farol_vazio.json")
+    simulador = MotorDeSimulacao().cria("simulador_farol_obstaculos.json")
     if simulador.ativo:
         file_map = {
             1: "models/AmbienteFarol_agente1_genetica_v5.pkl"

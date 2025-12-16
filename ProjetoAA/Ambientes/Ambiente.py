@@ -89,4 +89,3 @@ class Ambiente(ABC):
             if (x, y) not in self.obstaculos and (x,y) not in self.recursos:
                 return x, y
 
-

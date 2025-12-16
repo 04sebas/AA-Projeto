@@ -186,7 +186,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",
@@ -207,8 +207,8 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
-      "posicao_inicial": "random",
+      "quantidade": 1,
+      "posicao_inicial": [[0,0]],
       "trainable": true,
       "tipo_estrategia": "dqn",
       "politica": {
@@ -217,9 +217,9 @@
       "estrategia_conf": {
         "hidden": [16, 8],
         "episodes": 100,
-        "passos_por_ep": 500,
+        "passos_por_ep": 1000,
         "gamma": 0.99,
-        "epsilon": 1.0,
+        "epsilon": 0.7,
         "epsilon_min": 0.1,
         "epsilon_decay": 0.985,
         "batch_size": 32,
