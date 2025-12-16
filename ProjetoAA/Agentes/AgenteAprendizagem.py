@@ -166,10 +166,7 @@ class AgenteAprendizagem(Agente):
                     tipo = objeto.get("tipo", "")
                     if tipo == "obstaculo":
                         features.append(-0.9)
-                    elif tipo == "farol":
-                        features.append(0.8)
-
-                    elif tipo == "recurso":
+                    elif tipo in ("recurso", "farol"):
                         if getattr(obs, "carga", 0) <= 0:
                             features.append(0.9)
                         else:
@@ -212,12 +209,14 @@ class AgenteAprendizagem(Agente):
             goal_x = 0.0
             goal_y = 0.0
 
-        return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y])).astype(np.float32)
+        carrying = float(getattr(obs, "carga", 0) > 0)
+
+        return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y, carrying])).astype(np.float32)
 
     def get_input_size(self):
         alcance = self.sensores.alcance
         num_features = (2 * alcance + 1) ** 2 - 1
-        return int(num_features + 4)
+        return int(num_features + 5)
 
     def set_action_space(self, nomes_accao):
         self.nomes_accao = list(nomes_accao)

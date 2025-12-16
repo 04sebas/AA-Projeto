@@ -125,7 +125,7 @@ class EstrategiaDQN:
 
         rewards_history = []
         paths = []
-
+        start = [0,0]
         for ep in range(self.episodes):
             if hasattr(ambiente, "reset"):
                 ambiente.reset()

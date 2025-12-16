@@ -36,7 +36,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
+      "quantidade": 0,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",
@@ -57,7 +57,7 @@
 
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": [[0,0]],
       "trainable": true,
       "tipo_estrategia": "dqn",
