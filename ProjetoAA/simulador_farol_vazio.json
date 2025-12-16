@@ -22,21 +22,9 @@
         "alcance": 3
       }
     },
-
-    {
-      "tipo": "AgenteFixo",
-      "quantidade": 0,
-      "posicao_inicial": [10, 10],
-      "trainable": false,
-      "politica": {
-        "tipo": "random",
-        "alcance": 3
-      }
-    },
-
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": "random",
       "trainable": true,
       "tipo_estrategia": "genetica",

@@ -162,21 +162,23 @@ class MotorDeSimulacao:
                 if isinstance(pos, list):
                     pos = tuple(pos)
                 if tipo == "AgenteFixo":
+                    politica_agente = config.get("politica", {}) or {}
+                    tipo_politica = politica_agente.get("tipo", "fixo")
+                    nome_agente = f"AgenteFixo_{tipo_politica}_{len(self.agentes)}"
                     agente = AgenteFixo(
                         posicao=list(pos),
-                        politica=config.get("politica", {}),
-                        nome=f"AgenteFixo_{i}"
+                        politica=politica_agente,
+                        nome=nome_agente
                     )
                 elif tipo == "AgenteAprendizagem":
-                    politica_agente = config.get("politica", {})
+                    politica_agente = config.get("politica", {}) or {}
                     tipo_estrategia = config.get("tipo_estrategia", "genetica")
-
+                    nome_agente = f"AgenteAprendizagem_{tipo_estrategia}_{len(self.agentes)}"
                     agente = AgenteAprendizagem(
-                        nome=f"Agente Aprendizagem {tipo_estrategia}",
+                        nome=nome_agente,
                         politica=politica_agente,
                         posicao=list(pos)
                     )
-
                     agente.trainable = bool(config.get("trainable", False))
                     agente.tipo_estrategia = tipo_estrategia
                     agente.estrategia_conf = config.get("estrategia_conf", {})
@@ -690,17 +692,157 @@ class MotorDeSimulacao:
 
         print(f"[GIF] Animação salva em {filepath}")
 
+    def run_experiments(self, num_runs: int = 30, max_passos: int = None, file_map: dict = None,agents_to_load: list = None, seed: int = None, save_plot: str = None):
+        import numpy as _np
+        import random
+
+        if file_map:
+            try:
+                self.load_networks(file_map=file_map, agents=agents_to_load or list(file_map.keys()))
+            except Exception as e:
+                print(f"[run_experiments] Aviso ao carregar redes: {e}")
+
+        original_visual = getattr(self, "visualizacao", False)
+        self.visualizacao = False
+
+        agent_names = [getattr(a, "nome", f"Agente_{i}") for i, a in enumerate(self.agentes)]
+        fitness_runs = []
+
+        is_foraging = "AmbienteForaging" in self.ambiente.nome
+
+        if is_foraging:
+            resources_by_agent = {name: {"recolhidos": 0, "depositados": 0} for name in agent_names}
+        else:
+            successes_by_agent = {name: 0 for name in agent_names}
+
+        for i in range(num_runs):
+            if seed is not None:
+                s = int(seed) + i
+                _np.random.seed(s)
+                random.seed(s)
+
+            if hasattr(self.ambiente, "reset"):
+                self.ambiente.reset()
+            self.ambiente.posicoes = {}
+
+            for agente in self.agentes:
+                agente.pos = None
+                agente.recompensa_total = 0.0
+                agente.found_goal = False
+
+                if hasattr(agente, "recursos_recolhidos"):
+                    agente.recursos_recolhidos = 0
+                if hasattr(agente, "recursos_depositados"):
+                    agente.recursos_depositados = 0
+
+            self.executa(max_passos=max_passos)
+
+            total_fitness = 0.0
+            for idx, agente in enumerate(self.agentes):
+                nome = getattr(agente, "nome", f"Agente_{idx}")
+                total_fitness += float(getattr(agente, "recompensa_total", 0.0) or 0.0)
+                if is_foraging:
+                    recolh = int(getattr(agente, "recursos_recolhidos", 0) or 0)
+                    depos = int(getattr(agente, "recursos_depositados", 0) or 0)
+                    resources_by_agent[nome]["recolhidos"] += recolh
+                    resources_by_agent[nome]["depositados"] += depos
+                else:
+                    if bool(getattr(agente, "found_goal", False)):
+                        successes_by_agent[nome] += 1
+
+            fitness_runs.append(total_fitness)
+
+            try:
+                self.ambiente.posicoes = {}
+            except Exception:
+                pass
+
+        self.visualizacao = original_visual
+
+        fitness_arr = _np.array(fitness_runs, dtype=float)
+        stats = {
+            "fitness_mean": float(fitness_arr.mean()) if len(fitness_arr) else 0.0,
+            "fitness_std": float(fitness_arr.std()) if len(fitness_arr) else 0.0
+        }
+
+        if is_foraging:
+            stats["resources_totals"] = {name: {"recolhidos": v["recolhidos"], "depositados": v["depositados"]} for name, v in resources_by_agent.items()}
+        else:
+            stats["successes_by_agent"] = successes_by_agent
+
+        try:
+            plt.figure(figsize=(10, 4))
+            plt.plot(range(1, len(fitness_runs) + 1), fitness_runs, marker="o")
+            plt.xlabel("Simulação")
+            plt.ylabel("Fitness total")
+            plt.title(f"Fitness por simulação (mean={stats['fitness_mean']:.2f}, std={stats['fitness_std']:.2f})")
+            plt.grid(True)
+            plt.tight_layout()
+            if save_plot:
+                plt.savefig(save_plot.replace(".png", "_fitness.png"), dpi=200)
+            plt.show()
+        except Exception as e:
+            print(f"[run_experiments] Erro ao desenhar fitness plot: {e}")
+
+        try:
+            plt.figure(figsize=(10, 4))
+            names = agent_names
+            if is_foraging:
+                recolhidos = [resources_by_agent[n]["recolhidos"] for n in names]
+                depositados = [resources_by_agent[n]["depositados"] for n in names]
+                import numpy as _np_local
+                x = _np_local.arange(len(names))
+                width = 0.35
+                plt.bar(x - width / 2, recolhidos, width, label="Recolhidos")
+                plt.bar(x + width / 2, depositados, width, label="Depositados")
+                plt.xlabel("Agente")
+                plt.ylabel("Recursos (total em todas as simulações)")
+                plt.title("Recursos recolhidos e depositados por agente")
+                plt.xticks(x, names, rotation=45, ha="right")
+                plt.legend()
+                plt.grid(axis="y")
+                plt.tight_layout()
+                if save_plot:
+                    plt.savefig(save_plot.replace(".png", "_resources_by_agent.png"), dpi=200)
+                plt.show()
+            else:
+                values = [successes_by_agent[n] for n in names]
+                plt.bar(names, values)
+                plt.xlabel("Agente")
+                plt.ylabel("Nº de vezes que chegou ao goal")
+                plt.title("Sucessos por agente")
+                plt.grid(axis="y")
+                plt.tight_layout()
+                if save_plot:
+                    plt.savefig(save_plot.replace(".png", "_successes_by_agent.png"), dpi=200)
+                plt.show()
+        except Exception as e:
+            print(f"[run_experiments] Erro ao desenhar successes/resources plot: {e}")
+
+        result = {
+            "fitness_runs": fitness_runs,
+            "summary": stats
+        }
+        if is_foraging:
+            result["resources_by_agent"] = resources_by_agent
+        else:
+            result["successes_by_agent"] = successes_by_agent
+
+        return result
+
 
 if __name__ == "__main__":
-    simulador = MotorDeSimulacao().cria("simulador_farol_obstaculos.json")
+    simulador = MotorDeSimulacao().cria("simulador_foraging.json")
     if simulador.ativo:
         file_map = {
-            1: "models/AmbienteFarol_agente1_genetica_v5.pkl"
+            2: "models/AmbienteForaging_agente2_genetica_v1.pkl",
+            3: "models/AmbienteForaging_agente3_dqn_v1.pkl"
         }
-        #resumo = simulador.load_networks(file_map=file_map, agents=[1])
+        #resumo = simulador.load_networks(file_map=file_map, agents=[2,3])
         #print(resumo)
-
-        simulador.fase_treino()
-        simulador.fase_teste()
+        resultados = simulador.run_experiments(num_runs=30, max_passos=750, file_map=file_map, seed=20,save_plot="results/aggregate.png")
+        print("Resumo:", resultados["summary"])
+        #simulador.fase_treino()
+        #simulador.fase_teste()
         #simulador.salvar_animacao_gif("models/trajetorias_foraging.gif", fps=12, trail_len=30)
 
