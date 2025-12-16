@@ -6,8 +6,8 @@
 
   "ambiente": {
     "tipo": "AmbienteForaging",
-    "largura": 50,
-    "altura": 50,
+    "largura": 51,
+    "altura": 51,
     "recursos": [
       { "pos": [26, 8], "quantidade": 1, "valor": 100 },
       { "pos": [15, 12], "quantidade": 1, "valor": 100 },
@@ -79,16 +79,6 @@
       }
     },
     {
-      "tipo": "AgenteFixo",
-      "quantidade": 0,
-      "posicao_inicial": "random",
-      "trainable": false,
-      "politica": {
-        "tipo": "random",
-        "alcance": 3
-      }
-    },
-    {
       "tipo": "AgenteAprendizagem",
       "quantidade": 1,
       "posicao_inicial": [[0,45]],
@@ -110,7 +100,7 @@
     },
     {
       "tipo": "AgenteAprendizagem",
-      "quantidade": 0,
+      "quantidade": 1,
       "posicao_inicial": [[0,0]],
       "trainable": true,
       "tipo_estrategia": "dqn",
