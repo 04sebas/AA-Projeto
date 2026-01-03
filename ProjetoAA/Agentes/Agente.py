@@ -1,55 +1,43 @@
 from abc import ABC, abstractmethod
-
-from ProjetoAA.Objetos.Accao import Accao
-from ProjetoAA.Objetos.Observacao import Observacao
 from ProjetoAA.Objetos.Sensor import Sensor
-
+from ProjetoAA.Objetos.Accao import Accao
 
 class Agente(ABC):
-    def __init__(self, pos,nome):
-        self.sensores = Sensor()
-        self.recompensa_total = 0.0
+    def __init__(self, pos, nome, politica=None):
         self.pos = pos
         self.nome = nome
+        self.politica = politica or {}
+        
+        self.recompensa_total = 0.0
+        self.recursos_recolhidos = 0
+        self.recursos_depositados = 0
+        self.encontrou_objetivo = False
+        self.treinavel = False
+        
+        self.ultima_obs = None
+        
+        alcance = self.politica.get("alcance", 1)
+        self.sensores = Sensor(alcance=alcance)
 
     @classmethod
     @abstractmethod
-    def cria(cls, nome_do_ficheiro_parametros: str) -> "Agente":
-        """
-        Cria e configura um agente com base num ficheiro de parâmetros.
-        """
+    def cria(cls, nome_do_ficheiro_parametros: str):
         pass
 
     @abstractmethod
-    def observacao(self, obs: Observacao):
-        """
-        Recebe a observação do ambiente e atualiza o estado interno do agente.
-        """
-        pass
+    def observacao(self, obs):
+        self.ultima_obs = obs
 
     @abstractmethod
     def age(self) -> Accao:
-        """
-        Decide e devolve a ação a executar.
-        """
         pass
 
-    @abstractmethod
     def avaliacao_estado_atual(self, recompensa: float):
-        """
-        Atualiza o agente com a recompensa recebida do ambiente.
-        """
-        pass
+        self.recompensa_total += recompensa
 
     def instala(self, sensor: Sensor):
-        """
-        Instala um sensor (objeto que fornece percepções ao agente).
-        """
         self.sensores.append(sensor)
 
     @abstractmethod
-    def comunica(self, mensagem: str, de_agente: "Agente"):
-        """
-        Método genérico de comunicação entre agentes (opcional).
-        """
+    def comunica(self, mensagem: str, de_agente):
         pass

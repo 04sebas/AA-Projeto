@@ -7,21 +7,21 @@ from ProjetoAA.Agentes.AgenteFixo import AgenteFixo
 from ProjetoAA.Ambientes.AmbienteFarol import AmbienteFarol
 from ProjetoAA.Ambientes.AmbienteForaging import AmbienteForaging
 from ProjetoAA.Aprendizagem.EstrategiaGenetica import EstrategiaGenetica
-from ProjetoAA.Aprendizagem.EstrategiaQLearning import EstrategiaDQN
+from ProjetoAA.Aprendizagem.EstrategiaQLearning import EstrategiaQLearning
 
 
-def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_dir="models", tipo="genetica"):
+def _salvar_melhor_rn(ambiente, index_agente, pesos, objeto_rn, arq_rn=None, pasta_saida="models", tipo="genetica"):
     import os, pickle, re, time
 
-    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(pasta_saida, exist_ok=True)
 
-    env_name = getattr(ambiente, "nome", type(ambiente).__name__)
-    base_prefix = f"{env_name}_agente{agent_index}_{tipo}"
+    nome_ambiente = getattr(ambiente, "nome", type(ambiente).__name__)
+    prefixo_base = f"{nome_ambiente}_agente{index_agente}_{tipo}"
 
-    pattern = re.compile(rf"^{re.escape(base_prefix)}(?:_v(\d+))?\.pkl$")
+    padrao = re.compile(rf"^{re.escape(prefixo_base)}(?:_v(\d+))?\.pkl$")
     max_v = 0
-    for fn in os.listdir(out_dir):
-        m = pattern.match(fn)
+    for fn in os.listdir(pasta_saida):
+        m = padrao.match(fn)
         if m:
             if m.group(1):
                 try:
@@ -34,35 +34,35 @@ def _salvar_melhor_nn(ambiente, agent_index, weights, nn_obj, nn_arch=None, out_
                 if max_v < 1:
                     max_v = 1
 
-    next_v = max_v + 1 if max_v > 0 else 1
-    filename = f"{base_prefix}_v{next_v}.pkl"
+    prox_v = max_v + 1 if max_v > 0 else 1
+    nome_ficheiro = f"{prefixo_base}_v{prox_v}.pkl"
 
-    path = os.path.join(out_dir, filename)
+    caminho = os.path.join(pasta_saida, nome_ficheiro)
 
     meta = {
-        "env_name": env_name,
-        "agent_index": agent_index,
-        "nn_arch": nn_arch if nn_arch is not None else getattr(nn_obj, "arch", None),
+        "env_name": nome_ambiente,
+        "agent_index": index_agente,
+        "nn_arch": arq_rn if arq_rn is not None else getattr(objeto_rn, "arq_rn", None),
         "tipo": tipo,
         "timestamp": int(time.time()),
     }
 
-    data = {
+    dados = {
         "meta": meta,
-        "weights_flat": weights,
-        "hidden_weights": getattr(nn_obj, "hidden_weights", None),
-        "hidden_biases": getattr(nn_obj, "hidden_biases", None),
-        "output_weights": getattr(nn_obj, "output_weights", None),
-        "output_bias": getattr(nn_obj, "output_bias", None),
+        "weights_flat": pesos,
+        "hidden_weights": getattr(objeto_rn, "pesos_ocultos", None),
+        "hidden_biases": getattr(objeto_rn, "vies_ocultos", None),
+        "output_weights": getattr(objeto_rn, "pesos_saida", None),
+        "output_bias": getattr(objeto_rn, "vies_saida", None),
     }
 
-    with open(path, "wb") as f:
-        pickle.dump(data, f)
+    with open(caminho, "wb") as f:
+        pickle.dump(dados, f)
 
-    print(f"[SALVO] NN (tipo={tipo}) guardada em {path}")
-    return path, meta
+    print(f"[GUARDADO] RN (tipo={tipo}) guardada em {caminho}")
+    return caminho, meta
 
-def _to_offsets(offsets):
+def _para_offsets(offsets):
     arr = np.asarray(offsets, dtype=float)
     if arr.size == 0:
         return np.empty((0, 2), dtype=float)
@@ -149,7 +149,7 @@ class MotorDeSimulacao:
             tipo = config.get("tipo")
             quantidade = config.get("quantidade", 1)
             posicoes = config.get("posicao_inicial", "random")
-            trainable = config.get("trainable", True)
+            treinavel = config.get("trainable", True)
 
             for i in range(quantidade):
                 if posicoes == "random":
@@ -179,153 +179,154 @@ class MotorDeSimulacao:
                         politica=politica_agente,
                         posicao=list(pos)
                     )
-                    agente.trainable = bool(config.get("trainable", False))
+                    agente.treinavel = bool(config.get("trainable", False))
                     agente.tipo_estrategia = tipo_estrategia
                     agente.estrategia_conf = config.get("estrategia_conf", {})
                 else:
                     raise ValueError(f"Tipo de agente desconhecido: {tipo}")
 
-                agente.trainable = bool(trainable)
+                agente.treinavel = bool(treinavel)
                 agente.pos = list(pos)
                 self.agentes.append(agente)
                 print(f"Criado agente {agente.nome} na posição {pos}")
 
-    def carregar_rede(self, filepath, agente_idx):
+    def carregar_rede(self, caminho_ficheiro, indice_agente):
         import pickle, os
-        from ProjetoAA.Aprendizagem.RedeNeuronal import RedeNeuronal, relu, output_fn
+        from ProjetoAA.Aprendizagem.RedeNeuronal import RedeNeuronal, relu, funcao_saida
 
         base = os.path.dirname(__file__)
-        fullpath = os.path.join(base, filepath)
+        caminho_completo = os.path.join(base, caminho_ficheiro)
 
-        if not os.path.exists(fullpath):
-            raise FileNotFoundError(f"Não encontrado: {fullpath}")
+        if not os.path.exists(caminho_completo):
+            raise FileNotFoundError(f"Não encontrado: {caminho_completo}")
 
-        with open(fullpath, "rb") as f:
-            data = pickle.load(f)
+        with open(caminho_completo, "rb") as f:
+            dados = pickle.load(f)
 
-        meta = data.get("meta", {})
-        nn_arch = meta.get("nn_arch")
-        tipo = meta.get("tipo", "unknown")
+        meta = dados.get("meta", {})
+        arq_rn = meta.get("nn_arch")
+        tipo = meta.get("tipo", "desconhecido")
 
-        nn_obj = None
+        obj_rn = None
         try:
-            if nn_arch:
-                input_size, output_size, hidden_arch = nn_arch
-                nn_obj = RedeNeuronal(input_size, output_size, hidden_arch, relu, output_fn)
-                if data.get("hidden_weights") is not None:
-                    nn_obj.hidden_weights = data.get("hidden_weights")
-                if data.get("hidden_biases") is not None:
-                    nn_obj.hidden_biases = data.get("hidden_biases")
-                if data.get("output_weights") is not None:
-                    nn_obj.output_weights = data.get("output_weights")
-                if data.get("output_bias") is not None:
-                    nn_obj.output_bias = data.get("output_bias")
+            if arq_rn:
+                tamanho_entrada, tamanho_saida, arq_oculta = arq_rn
+                obj_rn = RedeNeuronal(tamanho_entrada, tamanho_saida, arq_oculta, relu, funcao_saida)
+                if dados.get("hidden_weights") is not None:
+                    obj_rn.pesos_ocultos = dados.get("hidden_weights")
+                if dados.get("hidden_biases") is not None:
+                    obj_rn.vies_ocultos = dados.get("hidden_biases")
+                if dados.get("output_weights") is not None:
+                    obj_rn.pesos_saida = dados.get("output_weights")
+                if dados.get("output_bias") is not None:
+                    obj_rn.vies_saida = dados.get("output_bias")
 
-                if hasattr(nn_obj, "weights") and data.get("weights_flat") is not None:
+                if hasattr(obj_rn, "pesos") and dados.get("weights_flat") is not None:
                     try:
-                        nn_obj.weights = data.get("weights_flat")
+                        obj_rn.pesos = dados.get("weights_flat")
                     except Exception:
                         pass
 
         except Exception as e:
-            print(f"[LOAD] Aviso: não foi possível reconstruir a RedeNeuronal a partir do meta.nn_arch: {e}")
-            nn_obj = None
+            print(f"[CARREGAR] Aviso: não foi possível reconstruir a RedeNeuronal a partir do meta.nn_arch: {e}")
+            obj_rn = None
 
-        agente = self.agentes[agente_idx]
+        agente = self.agentes[indice_agente]
 
-        if nn_obj is not None:
-            agente.neural_network = nn_obj
-            agente.weights = data.get("weights_flat")
-            print(f"[LOAD] NN reconstruída e atribuída ao agente {agente_idx} (tipo={tipo})")
+        if obj_rn is not None:
+            agente.rede_neuronal = obj_rn
+            agente.pesos = dados.get("weights_flat")
+            print(f"[CARREGAR] RN reconstruída e atribuída ao agente {indice_agente} (tipo={tipo})")
             return
 
-        agente.weights = data.get("weights_flat")
+        agente.pesos = dados.get("weights_flat")
         try:
-            nn_existing = getattr(agente, "neural_network", None)
-            if nn_existing is not None:
-                if data.get("hidden_weights") is not None:
-                    setattr(nn_existing, "hidden_weights", data.get("hidden_weights"))
-                if data.get("hidden_biases") is not None:
-                    setattr(nn_existing, "hidden_biases", data.get("hidden_biases"))
-                if data.get("output_weights") is not None:
-                    setattr(nn_existing, "output_weights", data.get("output_weights"))
-                if data.get("output_bias") is not None:
-                    setattr(nn_existing, "output_bias", data.get("output_bias"))
-                print(f"[LOAD] Pesos atribuídos à neural_network existente do agente {agente_idx}")
+            rn_existente = getattr(agente, "rede_neuronal", None)
+            if rn_existente is not None:
+                if dados.get("hidden_weights") is not None:
+                    setattr(rn_existente, "pesos_ocultos", dados.get("hidden_weights"))
+                if dados.get("hidden_biases") is not None:
+                    setattr(rn_existente, "vies_ocultos", dados.get("hidden_biases"))
+                if dados.get("output_weights") is not None:
+                    setattr(rn_existente, "pesos_saida", dados.get("output_weights"))
+                if dados.get("output_bias") is not None:
+                    setattr(rn_existente, "vies_saida", dados.get("output_bias"))
+                print(f"[CARREGAR] Pesos atribuídos à rede_neuronal existente do agente {indice_agente}")
                 return
         except Exception:
             pass
 
-        print(f"[LOAD] Apenas weights_flat carregados para agente {agente_idx} (tipo={tipo}).")
+        print(f"[CARREGAR] Apenas weights_flat carregados para agente {indice_agente} (tipo={tipo}).")
 
-    def load_networks(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
-        summary = {}
+    def carregar_redes(self, padrao: str = None, mapa_ficheiros: dict = None, agentes: list = None, detalhado: bool = True):
+        resumo = {}
 
-        if agents is None:
-            agents = list(range(len(self.agentes)))
+        if agentes is None:
+            agentes = list(range(len(self.agentes)))
 
-        file_map = file_map or {}
+        mapa_ficheiros = mapa_ficheiros or {}
 
-        for idx in agents:
+        for idx in agentes:
             if idx < 0 or idx >= len(self.agentes):
-                summary[idx] = {"status": "error", "msg": "Índice de agente inválido"}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Índice inválido: {idx}")
+                resumo[idx] = {"status": "erro", "msg": "Índice de agente inválido"}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Índice inválido: {idx}")
                 continue
 
             agente = self.agentes[idx]
 
-            if not getattr(agente, "trainable", False):
-                summary[idx] = {"status": "skipped", "msg": "agente não treinável"}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Agente {idx} (não treinável) - skip")
+            if not getattr(agente, "treinavel", False):
+                resumo[idx] = {"status": "ignorado", "msg": "agente não treinável"}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Agente {idx} (não treinável) - ignorado")
                 continue
 
-            filepath = None
-            if idx in file_map:
-                filepath = file_map[idx]
-            elif pattern is not None:
+            caminho_ficheiro = None
+            if idx in mapa_ficheiros:
+                caminho_ficheiro = mapa_ficheiros[idx]
+            elif padrao is not None:
                 try:
-                    filepath = pattern.format(idx=idx)
+                    caminho_ficheiro = padrao.format(idx=idx)
                 except Exception as e:
-                    summary[idx] = {"status": "error", "msg": f"Erro a formatar pattern: {e}"}
-                    if verbose:
-                        print(f"[LOAD_NETWORKS] Erro a formatar pattern para agente {idx}: {e}")
+                    resumo[idx] = {"status": "erro", "msg": f"Erro a formatar padrão: {e}"}
+                    if detalhado:
+                        print(f"[CARREGAR_REDES] Erro a formatar padrão para agente {idx}: {e}")
                     continue
             else:
-                summary[idx] = {"status": "skipped", "msg": "nenhum pattern nem file_map fornecido"}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Agente {idx} - nenhum ficheiro especificado")
+                resumo[idx] = {"status": "ignorado", "msg": "nenhum padrão nem mapa_ficheiros fornecido"}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Agente {idx} - nenhum ficheiro especificado")
                 continue
 
             try:
-                self.carregar_rede(filepath, idx)
-                summary[idx] = {"status": "loaded", "msg": filepath}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Sucesso: agente {idx} <- {filepath}")
+                self.carregar_rede(caminho_ficheiro, idx)
+                resumo[idx] = {"status": "carregado", "msg": caminho_ficheiro}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Sucesso: agente {idx} <- {caminho_ficheiro}")
             except FileNotFoundError:
-                summary[idx] = {"status": "missing", "msg": filepath}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Ficheiro não encontrado para agente {idx}: {filepath}")
+                resumo[idx] = {"status": "falta", "msg": caminho_ficheiro}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Ficheiro não encontrado para agente {idx}: {caminho_ficheiro}")
             except Exception as e:
-                summary[idx] = {"status": "error", "msg": str(e)}
-                if verbose:
-                    print(f"[LOAD_NETWORKS] Erro ao carregar agente {idx} de {filepath}: {e}")
+                resumo[idx] = {"status": "erro", "msg": str(e)}
+                if detalhado:
+                    print(f"[CARREGAR_REDES] Erro ao carregar agente {idx} de {caminho_ficheiro}: {e}")
 
-        return summary
+        return resumo
 
-    def autoload_if_flag(self, pattern: str = None, file_map: dict = None, agents: list = None, verbose: bool = True):
+    def carregar_automatico_se_flag(self, padrao: str = None, mapa_ficheiros: dict = None, agentes: list = None, detalhado: bool = True):
         if getattr(self, "autoload_models", False):
-            return self.load_networks(pattern=pattern, file_map=file_map, agents=agents, verbose=verbose)
-        if verbose:
-            print("[autoload_if_flag] autoload_models não activado; nenhum ficheiro carregado.")
+            return self.carregar_redes(padrao=padrao, mapa_ficheiros=mapa_ficheiros, agentes=agentes, detalhado=detalhado)
+        if detalhado:
+            print("[carregar_automatico_se_flag] autoload_models não ativado; nenhum ficheiro carregado.")
         return {}
 
+
     def fase_treino(self):
-        saved_files = {}
+        ficheiros_salvos = {}
 
         for idx, agente in enumerate(self.agentes):
-            if not getattr(agente, "trainable", False):
+            if not getattr(agente, "treinavel", False):
                 continue
 
             tipo = getattr(agente, "tipo_estrategia", None)
@@ -333,104 +334,104 @@ class MotorDeSimulacao:
             if conf is None:
                 conf = self._obter_config_estrategia(tipo or "genetica")
 
-            available_actions = ["cima", "baixo", "direita", "esquerda"]
+            acoes_disponiveis = ["cima", "baixo", "direita", "esquerda"]
             if getattr(self.ambiente, "recursos", None):
-                if "recolher" not in available_actions:
-                    available_actions.append("recolher")
+                if "recolher" not in acoes_disponiveis:
+                    acoes_disponiveis.append("recolher")
             if getattr(self.ambiente, "ninhos", None):
-                if "depositar" not in available_actions:
-                    available_actions.append("depositar")
+                if "depositar" not in acoes_disponiveis:
+                    acoes_disponiveis.append("depositar")
 
             if hasattr(agente, "set_action_space"):
-                agente.set_action_space(available_actions)
+                agente.set_action_space(acoes_disponiveis)
             else:
-                agente.nomes_accao = available_actions
+                agente.nomes_accao = acoes_disponiveis
 
             try:
-                input_size = agente.get_input_size()
+                tamanho_entrada = agente.obter_tamanho_entrada()
             except Exception:
                 alcance = getattr(agente.sensores, "alcance", 3)
-                input_size = (2 * alcance + 1) ** 2 - 1 + 5
+                tamanho_entrada = (2 * alcance + 1) ** 2 - 1 + 5
 
-            output_size = len(available_actions)
+            tamanho_saida = len(acoes_disponiveis)
 
             if tipo == "genetica":
-                ga = EstrategiaGenetica(
-                    populacao_tamanho=conf.get("populacao_tamanho", 100),
+                ag = EstrategiaGenetica(
+                    tamanho_populacao=conf.get("populacao_tamanho", 100),
                     taxa_mutacao=conf.get("taxa_mutacao", 0.01),
                     num_geracoes=conf.get("num_ger", 25),
                     tamanho_torneio=conf.get("tamanho_torneio", 2),
                     elitismo_frac=conf.get("elitismo_frac", 0.1),
-                    nn_arch=(input_size, output_size, conf.get("hidden", (16, 8))),
+                    arq_rn=(tamanho_entrada, tamanho_saida, conf.get("hidden", (16, 8))),
                     passos_por_avaliacao=conf.get("passos_por_avaliacao", 750),
-                    mutation_std=conf.get("mutation_std", 0.1),
+                    desvio_mutacao=conf.get("mutation_std", 0.1),
                 )
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = ga.run(self.ambiente, verbose=True,input_size=input_size)
+                melhores_pesos, melhor_rn = ag.treinar(self.ambiente, detalhado=True, tamanho_entrada=tamanho_entrada)
 
-                self.ambiente.reset()
+                self.ambiente.reiniciar()
 
-                agente.neural_network = best_nn
-                agente.weights = np.array(best_weights).copy()
+                agente.rede_neuronal = melhor_rn
+                agente.pesos = np.array(melhores_pesos).copy()
 
-                path, meta = _salvar_melhor_nn(
+                caminho, meta = _salvar_melhor_rn(
                     self.ambiente,
                     idx,
-                    best_weights,
-                    best_nn,
-                    nn_arch=getattr(ga, "nn_arch", None),
+                    melhores_pesos,
+                    melhor_rn,
+                    arq_rn=getattr(ag, "arq_rn", None),
                     tipo="genetica"
                 )
 
                 meta = dict(meta or {})
                 meta["tipo"] = "genetica"
-                saved_files[idx] = {"path": path, "meta": meta}
-                print(f"[fase_treino] Agente {idx}: rede genetica aplicada e salva em {path}")
+                ficheiros_salvos[idx] = {"path": caminho, "meta": meta}
+                print(f"[fase_treino] Agente {idx}: rede genética aplicada e salva em {caminho}")
 
             elif tipo == "dqn":
-                dqn_conf = conf or {}
-                dqn = EstrategiaDQN(
-                    nn_arch=(input_size, output_size, dqn_conf.get("hidden", (16, 8))),
-                    episodes=dqn_conf.get("episodes", 100),
-                    passos_por_ep=dqn_conf.get("passos_por_ep", 750),
-                    gamma=dqn_conf.get("gamma", 0.99),
-                    epsilon=dqn_conf.get("epsilon", 0.90),
-                    epsilon_min=dqn_conf.get("epsilon_min", 0.1),
-                    epsilon_decay=dqn_conf.get("epsilon_decay", 0.95),
-                    batch_size=dqn_conf.get("batch_size", 32),
-                    target_update_freq=dqn_conf.get("target_update_freq", 50),
-                    memory_size=dqn_conf.get("memory_size", 50000),
-                    learning_rate=dqn_conf.get("learning_rate", 0.001),
+                conf_dqn = conf or {}
+                dqn = EstrategiaQLearning(
+                    arq_rn=(tamanho_entrada, tamanho_saida, conf_dqn.get("hidden", (16, 8))),
+                    episodios=conf_dqn.get("episodes", 100),
+                    passos_por_ep=conf_dqn.get("passos_por_ep", 750),
+                    gama=conf_dqn.get("gamma", 0.99),
+                    epsilon=conf_dqn.get("epsilon", 0.90),
+                    epsilon_min=conf_dqn.get("epsilon_min", 0.1),
+                    decaimento_epsilon=conf_dqn.get("epsilon_decay", 0.95),
+                    tamanho_lote=conf_dqn.get("batch_size", 32),
+                    freq_atualizacao_alvo=conf_dqn.get("target_update_freq", 50),
+                    tamanho_memoria=conf_dqn.get("memory_size", 50000),
+                    taxa_aprendizagem=conf_dqn.get("learning_rate", 0.001),
                 )
 
                 self.ambiente.posicoes = {}
 
-                best_weights, best_nn = dqn.run(self.ambiente, verbose=True,alcance=agente.sensores.alcance)
+                melhores_pesos, melhor_rn = dqn.treinar(self.ambiente, detalhado=True, alcance=agente.sensores.alcance)
 
-                self.ambiente.reset()
+                self.ambiente.reiniciar()
 
-                agente.neural_network = best_nn
-                agente.weights = np.array(best_weights).copy()
+                agente.rede_neuronal = melhor_rn
+                agente.pesos = np.array(melhores_pesos).copy()
 
-                path, meta = _salvar_melhor_nn(
+                caminho, meta = _salvar_melhor_rn(
                     self.ambiente,
                     idx,
-                    best_weights,
-                    best_nn,
-                    nn_arch=getattr(dqn, "nn_arch", None),
+                    melhores_pesos,
+                    melhor_rn,
+                    arq_rn=getattr(dqn, "arq_rn", None),
                     tipo="dqn"
                 )
                 meta = dict(meta or {})
                 meta["tipo"] = "dqn"
-                saved_files[idx] = {"path": path, "meta": meta}
-                print(f"[fase_treino] Agente {idx}: rede dqn aplicada e salva em {path}")
+                ficheiros_salvos[idx] = {"path": caminho, "meta": meta}
+                print(f"[fase_treino] Agente {idx}: rede dqn aplicada e salva em {caminho}")
 
             else:
                 continue
 
-        return saved_files
+        return ficheiros_salvos
 
     def fase_teste(self):
         self.executa(self.max_passos)
@@ -481,10 +482,15 @@ class MotorDeSimulacao:
                 self.ambiente.atualizacao()
             self.passos += 1
 
-            if isinstance(self.ambiente, AmbienteFarol):
-                todos_terminaram = all(getattr(ag, "found_goal", False) for ag in self.agentes)
-            elif isinstance(self.ambiente, AmbienteForaging):
+            # Fix compatibility to check terminaton
+            if hasattr(self.ambiente, "terminou"):
                 todos_terminaram = self.ambiente.terminou(self.agentes)
+            else:
+                # Fallback
+                 if isinstance(self.ambiente, AmbienteFarol):
+                    todos_terminaram = all(getattr(ag, "encontrou_objetivo", False) for ag in self.agentes)
+                 elif isinstance(self.ambiente, AmbienteForaging):
+                    todos_terminaram = self.ambiente.terminou(self.agentes)
 
             if todos_terminaram:
                 print(f"Simulação terminada no passo {passo}!")
@@ -520,7 +526,6 @@ class MotorDeSimulacao:
                 recursos_items = list(recursos.items())
             else:
                 # lista de objetos/dicts com "pos", "quantidade", "valor"
-                recursos_items = []
                 for r in recursos:
                     pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
                     if pos is not None:
@@ -546,7 +551,7 @@ class MotorDeSimulacao:
             ny = [p[1] for p in ninhos]
             plt.scatter(nx, ny, s=200, marker='^', color='gold', edgecolors='k', label="Ninhos")
 
-        obs_raw = getattr(self.ambiente, "obstaculos_raw", None)
+        obs_raw = getattr(self.ambiente, "obstaculos_brutos", None)
         if obs_raw:
             obs_x = [p["pos"][0] for p in obs_raw]
             obs_y = [p["pos"][1] for p in obs_raw]
@@ -692,43 +697,46 @@ class MotorDeSimulacao:
 
         print(f"[GIF] Animação salva em {filepath}")
 
-    def run_experiments(self, num_runs: int = 30, max_passos: int = None, file_map: dict = None,agents_to_load: list = None, seed: int = None, save_plot: str = None):
+    def realizar_experiencias(self, num_execucoes: int = 30, max_passos: int = None, mapa_ficheiros: dict = None, agentes_para_carregar: list = None, semente: int = None, salvar_plot: str = None):
         import numpy as _np
         import random
 
-        if file_map:
+        if mapa_ficheiros:
             try:
-                self.load_networks(file_map=file_map, agents=agents_to_load or list(file_map.keys()))
+                self.carregar_redes(mapa_ficheiros=mapa_ficheiros, agentes=agentes_para_carregar or list(mapa_ficheiros.keys()))
             except Exception as e:
-                print(f"[run_experiments] Aviso ao carregar redes: {e}")
+                print(f"[realizar_experiencias] Aviso ao carregar redes: {e}")
 
-        original_visual = getattr(self, "visualizacao", False)
+        visual_original = getattr(self, "visualizacao", False)
         self.visualizacao = False
 
-        agent_names = [getattr(a, "nome", f"Agente_{i}") for i, a in enumerate(self.agentes)]
-        fitness_runs = []
+        nomes_agentes = [getattr(a, "nome", f"Agente_{i}") for i, a in enumerate(self.agentes)]
+        historico_fitness = []
 
-        is_foraging = "AmbienteForaging" in self.ambiente.nome
+        eh_foraging = "AmbienteForaging" in getattr(self.ambiente, "nome", "") or "Foraging" in str(type(self.ambiente))
 
-        if is_foraging:
-            resources_by_agent = {name: {"recolhidos": 0, "depositados": 0} for name in agent_names}
+        if eh_foraging:
+            recursos_por_agente = {nome: {"recolhidos": 0, "depositados": 0} for nome in nomes_agentes}
         else:
-            successes_by_agent = {name: 0 for name in agent_names}
+            sucessos_por_agente = {nome: 0 for nome in nomes_agentes}
 
-        for i in range(num_runs):
-            if seed is not None:
-                s = int(seed) + i
+        for i in range(num_execucoes):
+            if semente is not None:
+                s = int(semente) + i
                 _np.random.seed(s)
                 random.seed(s)
 
-            if hasattr(self.ambiente, "reset"):
+            if hasattr(self.ambiente, "reiniciar"):
+                self.ambiente.reiniciar()
+            elif hasattr(self.ambiente, "reset"):
                 self.ambiente.reset()
+                
             self.ambiente.posicoes = {}
 
             for agente in self.agentes:
                 agente.pos = None
                 agente.recompensa_total = 0.0
-                agente.found_goal = False
+                agente.encontrou_objetivo = False
 
                 if hasattr(agente, "recursos_recolhidos"):
                     agente.recursos_recolhidos = 0
@@ -737,112 +745,98 @@ class MotorDeSimulacao:
 
             self.executa(max_passos=max_passos)
 
-            total_fitness = 0.0
+            fitness_total = 0.0
             for idx, agente in enumerate(self.agentes):
                 nome = getattr(agente, "nome", f"Agente_{idx}")
-                total_fitness += float(getattr(agente, "recompensa_total", 0.0) or 0.0)
-                if is_foraging:
+                fitness_total += float(getattr(agente, "recompensa_total", 0.0) or 0.0)
+                if eh_foraging:
                     recolh = int(getattr(agente, "recursos_recolhidos", 0) or 0)
                     depos = int(getattr(agente, "recursos_depositados", 0) or 0)
-                    resources_by_agent[nome]["recolhidos"] += recolh
-                    resources_by_agent[nome]["depositados"] += depos
+                    recursos_por_agente[nome]["recolhidos"] += recolh
+                    recursos_por_agente[nome]["depositados"] += depos
                 else:
-                    if bool(getattr(agente, "found_goal", False)):
-                        successes_by_agent[nome] += 1
+                    if bool(getattr(agente, "encontrou_objetivo", False)):
+                        sucessos_por_agente[nome] += 1
 
-            fitness_runs.append(total_fitness)
+            historico_fitness.append(fitness_total)
 
             try:
                 self.ambiente.posicoes = {}
             except Exception:
                 pass
 
-        self.visualizacao = original_visual
+        self.visualizacao = visual_original
 
-        fitness_arr = _np.array(fitness_runs, dtype=float)
-        stats = {
-            "fitness_mean": float(fitness_arr.mean()) if len(fitness_arr) else 0.0,
-            "fitness_std": float(fitness_arr.std()) if len(fitness_arr) else 0.0
+        array_fitness = _np.array(historico_fitness, dtype=float)
+        estatisticas = {
+            "media_fitness": float(array_fitness.mean()) if len(array_fitness) else 0.0,
+            "desvio_fitness": float(array_fitness.std()) if len(array_fitness) else 0.0
         }
 
-        if is_foraging:
-            stats["resources_totals"] = {name: {"recolhidos": v["recolhidos"], "depositados": v["depositados"]} for name, v in resources_by_agent.items()}
+        if eh_foraging:
+            estatisticas["totais_recursos"] = {nome: {"recolhidos": v["recolhidos"], "depositados": v["depositados"]} for nome, v in recursos_por_agente.items()}
         else:
-            stats["successes_by_agent"] = successes_by_agent
+            estatisticas["sucessos_por_agente"] = sucessos_por_agente
 
         try:
             plt.figure(figsize=(10, 4))
-            plt.plot(range(1, len(fitness_runs) + 1), fitness_runs, marker="o")
+            plt.plot(range(1, len(historico_fitness) + 1), historico_fitness, marker="o")
             plt.xlabel("Simulação")
             plt.ylabel("Fitness total")
-            plt.title(f"Fitness por simulação (mean={stats['fitness_mean']:.2f}, std={stats['fitness_std']:.2f})")
+            plt.title(f"Fitness por simulação (média={estatisticas['media_fitness']:.2f}, desvio={estatisticas['desvio_fitness']:.2f})")
             plt.grid(True)
             plt.tight_layout()
-            if save_plot:
-                plt.savefig(save_plot.replace(".png", "_fitness.png"), dpi=200)
+            if salvar_plot:
+                plt.savefig(salvar_plot.replace(".png", "_fitness.png"), dpi=200)
             plt.show()
         except Exception as e:
-            print(f"[run_experiments] Erro ao desenhar fitness plot: {e}")
+            print(f"[realizar_experiencias] Erro ao desenhar fitness plot: {e}")
 
         try:
             plt.figure(figsize=(10, 4))
-            names = agent_names
-            if is_foraging:
-                recolhidos = [resources_by_agent[n]["recolhidos"] for n in names]
-                depositados = [resources_by_agent[n]["depositados"] for n in names]
+            nomes = nomes_agentes
+            if eh_foraging:
+                recolhidos = [recursos_por_agente[n]["recolhidos"] for n in nomes]
+                depositados = [recursos_por_agente[n]["depositados"] for n in nomes]
                 import numpy as _np_local
-                x = _np_local.arange(len(names))
+                x = _np_local.arange(len(nomes))
                 width = 0.35
                 plt.bar(x - width / 2, recolhidos, width, label="Recolhidos")
                 plt.bar(x + width / 2, depositados, width, label="Depositados")
-                plt.xlabel("Agente")
+                plt.xticks(x, nomes, rotation=45, ha="right")
                 plt.ylabel("Recursos (total em todas as simulações)")
-                plt.title("Recursos recolhidos e depositados por agente")
-                plt.xticks(x, names, rotation=45, ha="right")
+                plt.title("Recursos recolhidos e depositados por agente (Total)")
                 plt.legend()
-                plt.grid(axis="y")
                 plt.tight_layout()
-                if save_plot:
-                    plt.savefig(save_plot.replace(".png", "_resources_by_agent.png"), dpi=200)
+                if salvar_plot:
+                    plt.savefig(salvar_plot.replace(".png", "_recursos.png"), dpi=200)
                 plt.show()
             else:
-                values = [successes_by_agent[n] for n in names]
-                plt.bar(names, values)
+                sucessos = [sucessos_por_agente[n] for n in nomes]
+                plt.bar(nomes, sucessos)
                 plt.xlabel("Agente")
-                plt.ylabel("Nº de vezes que chegou ao goal")
-                plt.title("Sucessos por agente")
-                plt.grid(axis="y")
+                plt.ylabel("Nº de Sucessos")
+                plt.title("Sucessos por Agente (Total)")
                 plt.tight_layout()
-                if save_plot:
-                    plt.savefig(save_plot.replace(".png", "_successes_by_agent.png"), dpi=200)
+                if salvar_plot:
+                    plt.savefig(salvar_plot.replace(".png", "_sucessos.png"), dpi=200)
                 plt.show()
+
         except Exception as e:
-            print(f"[run_experiments] Erro ao desenhar successes/resources plot: {e}")
-
-        result = {
-            "fitness_runs": fitness_runs,
-            "summary": stats
-        }
-        if is_foraging:
-            result["resources_by_agent"] = resources_by_agent
-        else:
-            result["successes_by_agent"] = successes_by_agent
-
-        return result
-
+            print(f"[realizar_experiencias] Erro ao desenhar bar plot: {e}")
 
 if __name__ == "__main__":
     simulador = MotorDeSimulacao().cria("simulador_foraging.json")
     if simulador.ativo:
-        file_map = {
+        mapa_ficheiros = {
             2: "models/AmbienteForaging_agente2_genetica_v1.pkl",
             3: "models/AmbienteForaging_agente3_dqn_v1.pkl"
         }
-        #resumo = simulador.load_networks(file_map=file_map, agents=[2,3])
-        #print(resumo)
-        resultados = simulador.run_experiments(num_runs=30, max_passos=750, file_map=file_map, seed=20,save_plot="results/aggregate.png")
-        print("Resumo:", resultados["summary"])
+        resumo = simulador.carregar_redes(mapa_ficheiros=mapa_ficheiros, agentes=[2,3])
+        print(resumo)
+        #resultados = simulador.realizar_experiencias(num_execucoes=30, max_passos=750, mapa_ficheiros=mapa_ficheiros, semente=20, salvar_plot="results/aggregate.png")
+        #print("Resumo:", resultados["summary"])
         #simulador.fase_treino()
-        #simulador.fase_teste()
+        simulador.fase_teste()
         #simulador.salvar_animacao_gif("models/trajetorias_foraging.gif", fps=12, trail_len=30)
 

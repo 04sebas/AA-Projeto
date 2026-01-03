@@ -3,31 +3,25 @@ from ProjetoAA.Agentes.Agente import Agente
 from ProjetoAA.Aprendizagem.Politicas import DIRECOES, politica_aleatoria, politica_greedy
 from ProjetoAA.Objetos.Accao import Accao
 from ProjetoAA.Objetos.Observacao import Observacao
-from ProjetoAA.Objetos.Sensor import Sensor
-
 
 class AgenteFixo(Agente):
     def __init__(self, posicao=None, politica=None, nome="AF"):
-        if posicao is None:
-            posicao = [0, 0]
-        super().__init__(posicao, nome)
+        posicao = posicao if posicao is not None else [0, 0]
         politica = politica or {}
-        alcance = politica.get("alcance", 5)
-        self.found_goal = False
-        self.sensores = Sensor(alcance=alcance)
-        self.trainable = False
-        self.ultima_obs = None
-        self.politica = politica
+        if "alcance" not in politica:
+            politica["alcance"] = 5
+            
+        super().__init__(posicao, nome, politica)
+        
+        self.treinavel = False
         self.ultima_direcao = None
-        self.recursos_recolhidos = 0
-        self.recursos_depositados = 0
         self.ultimo_ninho = None
         self.posicao_prev = None
         self.passos_sem_mover = 0
         self.recursos_conhecidos = {}
         self.ultimo_recurso = None
         self.obstaculos_conhecidos = set()
-        self.stuck_threshold = politica.get("stuck_threshold", 2)
+        self.limite_imobilidade = self.politica.get("limite_imobilidade", 2)
 
     @classmethod
     def cria(cls, nome_do_ficheiro_parametros: str) -> "AgenteFixo":
@@ -51,7 +45,7 @@ class AgenteFixo(Agente):
             return cls()
 
     def observacao(self, obs: Observacao):
-        self.ultima_obs = obs
+        super().observacao(obs)
 
         pos_atual = tuple(getattr(obs, "posicao", None))
         if self.posicao_prev is None:
@@ -83,7 +77,7 @@ class AgenteFixo(Agente):
                 if self.ultimo_recurso == pos_atual:
                     self.ultimo_recurso = None
 
-        if self.passos_sem_mover >= self.stuck_threshold and self.ultima_direcao:
+        if self.passos_sem_mover >= self.limite_imobilidade and self.ultima_direcao:
             delta = DIRECOES.get(self.ultima_direcao, (0, 0))
             if pos_atual is not None:
                 tentativa = (pos_atual[0] + delta[0], pos_atual[1] + delta[1])
@@ -92,9 +86,8 @@ class AgenteFixo(Agente):
                 if tipo_na_frente not in ("recurso", "farol", "ninho"):
                     self.obstaculos_conhecidos.add(tentativa)
 
-
     def age(self) -> Accao:
-        if self.found_goal:
+        if self.encontrou_objetivo:
             return Accao("ficar")
 
         obs = self.ultima_obs
@@ -124,16 +117,13 @@ class AgenteFixo(Agente):
         if p_tipo == "random":
             return politica_aleatoria()
         if p_tipo == "greedy":
-            if getattr(obs, "carga",0) == 0 and self.ultimo_recurso and self.ultimo_recurso in self.recursos_conhecidos:
+            if getattr(obs, "carga", 0) == 0 and self.ultimo_recurso and self.ultimo_recurso in self.recursos_conhecidos:
                 return politica_greedy(self, obs, alvo_forcado=self.ultimo_recurso)
             if getattr(obs, "carga", 0) > 0 and self.ultimo_ninho:
                 return politica_greedy(self, obs, alvo_forcado=self.ultimo_ninho)
             return politica_greedy(self, obs)
 
         return Accao("ficar")
-
-    def avaliacao_estado_atual(self, recompensa: float):
-        self.recompensa_total += recompensa
 
     def comunica(self, mensagem: str, de_agente: "Agente"):
         print(f"[{self.nome}] recebeu mensagem de {de_agente.nome}: {mensagem}")

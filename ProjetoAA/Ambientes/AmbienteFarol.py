@@ -4,35 +4,15 @@ from ProjetoAA.Aprendizagem.Politicas import DIRECOES
 
 class AmbienteFarol(Ambiente):
     def __init__(self, largura=100, altura=100, pos_farol=(50,75), obstaculos=None):
-        self.largura = int(largura)
-        self.altura = int(altura)
+        super().__init__(largura, altura, obstaculos=obstaculos, nome="AmbienteFarol")
         self.pos_farol = (int(pos_farol[0]), int(pos_farol[1]))
 
-        parsed_obst = set()
-        for o in (obstaculos or []):
-            if isinstance(o, dict) and "pos" in o:
-                parsed_obst.add((int(o["pos"][0]), int(o["pos"][1])))
-            elif isinstance(o, (list, tuple)) and len(o) >= 2:
-                parsed_obst.add((int(o[0]), int(o[1])))
-        if self.pos_farol in parsed_obst:
-            parsed_obst.discard(self.pos_farol)
-
-        self.obstaculos = parsed_obst
-        self.obstaculos_raw = [{"pos": [p[0], p[1]]} for p in self.obstaculos]
+        if self.pos_farol in self.obstaculos:
+            self.obstaculos.discard(self.pos_farol)
 
         self.recursos = {self.pos_farol: {"tipo": "farol", "pos": list(self.pos_farol), "valor": 1500, "quantidade": 1}}
-
-        super().__init__(
-            largura=self.largura,
-            altura=self.altura,
-            recursos=self.recursos,
-            obstaculos=self.obstaculos,
-            nome="AmbienteFarol"
-        )
-
-        self.posicoes = {}
-        self.targets = {}
-        self.tempo = 0
+        self.obstaculos_brutos = [{"pos": [p[0], p[1]]} for p in self.obstaculos]
+        self.alvos = {}
 
     def observacao_para(self, agente):
         pos = tuple(self.posicoes.get(agente, (0, 0)))
@@ -50,71 +30,49 @@ class AmbienteFarol(Ambiente):
         obs.altura = self.altura
         agente.ultima_obs = obs
         obs.carga = 0
-
         obs.goal = self.pos_farol
         obs.foraging = False
-
         return obs
 
     def agir(self, accao, agente):
-        if getattr(agente, "found_goal", False):
+        if getattr(agente, "encontrou_objetivo", False):
             return 0.0
-        raw_pos = self.posicoes.get(agente, (0, 0))
-        x, y = int(raw_pos[0]), int(raw_pos[1])
+        pos_bruta = self.posicoes.get(agente, (0, 0))
+        x, y = int(pos_bruta[0]), int(pos_bruta[1])
 
         if (x, y) == self.pos_farol:
             recurso = self.recursos.get((x, y))
-            if recurso is not None:
-                valor = float(recurso.get("valor", 1500))
-                agente.found_goal = True
-                return valor
+            if recurso:
+                agente.encontrou_objetivo = True
+                return float(recurso.get("valor", 1500))
 
         if accao.nome == "recolher":
             return -0.5
 
         dx, dy = DIRECOES.get(accao.nome, (0, 0))
-        newx, newy = x + int(dx), y + int(dy)
+        novax, novay = x + int(dx), y + int(dy)
 
-        if not (0 <= newx < self.largura and 0 <= newy < self.altura):
-            return -1
-        if (newx, newy) in self.obstaculos:
+        if not self.posicao_valida(novax, novay):
             return -1
 
-        prev_dist = self.distance_to_goal(x, y)
+        dist_antiga = self.distancia_para_objetivo(x, y)
+        self.posicoes[agente] = (novax, novay)
+        agente.pos = (novax, novay)
+        nova_dist = self.distancia_para_objetivo(novax, novay)
 
-        self.posicoes[agente] = (newx, newy)
-        agente.pos = (newx, newy)
+        recompensa = -0.1
+        if (novax, novay) == (x, y):
+            recompensa -= 0.2
 
-        new_dist = self.distance_to_goal(newx, newy)
+        if nova_dist is not None and dist_antiga is not None and nova_dist < dist_antiga:
+            recompensa += 1.0
 
-        reward = -0.1
-        if (newx, newy) == (x, y):
-            reward -= 0.2
+        return recompensa
 
-        if new_dist is not None and prev_dist is not None and new_dist < prev_dist:
-            reward += 1.0
-
-        return reward
-
-    def distance_to_goal(self, x, y):
-        dx = abs(int(x) - self.pos_farol[0])
-        dy = abs(int(y) - self.pos_farol[1])
-        dist = dx + dy
+    def distancia_para_objetivo(self, x, y):
+        dist = abs(int(x) - self.pos_farol[0]) + abs(int(y) - self.pos_farol[1])
         max_dist = float(self.largura + self.altura) or 1.0
         return dist / max_dist
 
-
-    def atualizacao(self):
-        self.tempo += 1
-
-    def reset(self):
-        self.posicoes = {}
-        self.tempo = 0
-
     def terminou(self, agentes=None):
-        return all(getattr(a, "found_goal", False) for a in agentes)
-
-
-
-
-
+        return all(getattr(a, "encontrou_objetivo", False) for a in agentes)

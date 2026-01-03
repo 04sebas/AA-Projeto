@@ -1,44 +1,36 @@
 import math
 import random
-
 import numpy as np
-
 from ProjetoAA.Agentes.Agente import Agente
 from ProjetoAA.Objetos.Accao import Accao
-from ProjetoAA.Objetos.Sensor import Sensor
-
 
 class AgenteAprendizagem(Agente):
     def __init__(self, nome="AG", politica=None, posicao=None, nomes_accao=None):
-        self.neural_network = None
-        self.weights = None
-        if posicao is None:
-            posicao = [0, 0]
-        super().__init__(posicao, nome)
+        posicao = posicao if posicao is not None else [0, 0]
         politica = politica or {}
-        alcance = politica.get("alcance", 1)
-        self.sensores = Sensor(alcance=alcance)
-        self.ultima_obs = None
-        self.politica = politica
-        self.trainable = True
-
+        if "alcance" not in politica:
+            politica["alcance"] = 1
+            
+        super().__init__(posicao, nome, politica)
+        
+        self.rede_neuronal = None
+        self.pesos = None
+        self.treinavel = True
+        
         if nomes_accao is None:
-            self.nomes_accao = ["cima", "baixo", "direita", "esquerda","recolher", "depositar"]
+            self.nomes_accao = ["cima", "baixo", "direita", "esquerda", "recolher", "depositar"]
         else:
             self.nomes_accao = list(nomes_accao)
 
-        self.recursos_recolhidos = 0
-        self.recursos_depositados = 0
-        self.tipo_estrategia = politica.get("tipo_estrategia", "genetica")
-        self.estrategia_conf = politica.get("estrategia_conf", {})
-        self.found_goal = False
-        self.resources = set()
-        self.ninhos = set()
-        self.last_resource_value = 0
+        self.tipo_estrategia = self.politica.get("tipo_estrategia", "genetica")
+        self.estrategia_conf = self.politica.get("estrategia_conf", {})
+        
+        self.memoria_recursos = set()
+        self.memoria_ninhos = set()
+        self.valor_ultimo_recurso = 0
 
     def observacao(self, obs):
-        self.ultima_obs = obs
-
+        super().observacao(obs)
         pos_atual = tuple(getattr(obs, "posicao", None))
         percepcoes = getattr(obs, "percepcoes", []) or []
 
@@ -49,27 +41,27 @@ class AgenteAprendizagem(Agente):
             if tipo in ("recurso", "farol"):
                 quantidade = p.get("quantidade", 0)
                 if quantidade and quantidade > 0:
-                    self.resources.add(pos_t)
+                    self.memoria_recursos.add(pos_t)
                 else:
-                    self.resources.discard(pos_t)
+                    self.memoria_recursos.discard(pos_t)
 
             elif tipo == "ninho":
-                self.ninhos.add(pos_t)
+                self.memoria_ninhos.add(pos_t)
 
             elif tipo == "agente":
                 de_agente = p.get("ref")
                 if de_agente is not None:
                     self.comunica("foraging", de_agente)
 
-        if pos_atual in self.resources:
+        if pos_atual in self.memoria_recursos:
             if not any(tuple(p.get("pos")) == pos_atual and p.get("tipo") in ("recurso", "farol") for p in percepcoes):
-                self.resources.discard(pos_atual)
+                self.memoria_recursos.discard(pos_atual)
 
     def cria(self, ficheiro_parametros):
         return self
 
     def age(self):
-        if self.neural_network is None or self.ultima_obs is None:
+        if self.rede_neuronal is None or self.ultima_obs is None:
             return Accao(random.choice(self.nomes_accao[:4]))
 
         obs = self.ultima_obs
@@ -87,8 +79,8 @@ class AgenteAprendizagem(Agente):
         if getattr(obs, "carga", 0) > 0:
             ninhos_visiveis = [tuple(p.get("pos")) for p in percepcoes if p.get("tipo") == "ninho"]
             if ninhos_visiveis:
-                target = min(ninhos_visiveis, key=lambda pos: abs(pos[0] - px) + abs(pos[1] - py))
-                return Accao(self.__move_toward_action(target, (px, py)))
+                alvo = min(ninhos_visiveis, key=lambda pos: abs(pos[0] - px) + abs(pos[1] - py))
+                return Accao(self.__acao_mover_para(alvo, (px, py)))
 
         agentes_visiveis = [p.get("ref") for p in percepcoes if p.get("tipo") == "agente" and p.get("ref") is not None]
         if agentes_visiveis:
@@ -98,101 +90,97 @@ class AgenteAprendizagem(Agente):
         if getattr(obs, "carga", 0) == 0:
             recursos_visiveis = [tuple(p.get("pos")) for p in percepcoes if p.get("tipo") in ("recurso", "farol")]
             if recursos_visiveis:
-                target = min(recursos_visiveis, key=lambda pos: abs(pos[0] - px) + abs(pos[1] - py))
-                return Accao(self.__move_toward_action(target, (px, py)))
+                alvo = min(recursos_visiveis, key=lambda pos: abs(pos[0] - px) + abs(pos[1] - py))
+                return Accao(self.__acao_mover_para(alvo, (px, py)))
 
-        goal = getattr(obs, "goal", None)
-        if goal is None:
+        objetivo = getattr(obs, "goal", None)  # Note: Ambiente may still set 'goal' in observation
+        if objetivo is None:
             return Accao(random.choice(self.nomes_accao[:4]))
 
-        nn_input = self.build_nn_input(self.ultima_obs)
+        entrada_rn = self.construir_entrada_rn(self.ultima_obs)
 
         if self.tipo_estrategia in ("dqn", "genetica"):
-            output = self.neural_network.forward(nn_input)
-            action_index = int(np.argmax(output))
+            saida = self.rede_neuronal.propagar(entrada_rn)
+            indice_acao = int(np.argmax(saida))
         else:
             return Accao("ficar")
 
-        action_index = max(0, min(action_index, len(self.nomes_accao) - 1))
-        return Accao(self.nomes_accao[action_index])
-
-    def avaliacao_estado_atual(self, recompensa):
-        self.recompensa_total += recompensa
+        indice_acao = max(0, min(indice_acao, len(self.nomes_accao) - 1))
+        return Accao(self.nomes_accao[indice_acao])
 
     def comunica(self, mensagem, de_agente):
         if mensagem == "farol":
             return
 
         if mensagem == "foraging":
-            recursos_outro = getattr(de_agente, "resources", None)
-            entregas_outro = getattr(de_agente, "ninhos", None)
+            recursos_outro = getattr(de_agente, "memoria_recursos", None)
+            entregas_outro = getattr(de_agente, "memoria_ninhos", None)
 
             if isinstance(recursos_outro, set):
-                self.resources.update(recursos_outro)
+                self.memoria_recursos.update(recursos_outro)
 
             if isinstance(entregas_outro, set):
-                self.ninhos.update(entregas_outro)
-
+                self.memoria_ninhos.update(entregas_outro)
             return
 
-    def surroundings(self):
+    def vizinhanca(self):
         obs = self.ultima_obs
         if not obs:
-            input_size = (2 * self.sensores.alcance + 1) ** 2 - 1
-            return [-0.9] * input_size
+            tamanho_entrada = (2 * self.sensores.alcance + 1) ** 2 - 1
+            return [-0.9] * tamanho_entrada
 
         px, py = obs.posicao
         alcance = self.sensores.alcance
         percepcoes = obs.percepcoes or []
-        features = []
+        caracteristicas = []
 
-        goal = getattr(obs, "goal", None)
-        if goal is not None:
-            gx, gy = goal
-            dist_current = math.sqrt((px - gx) ** 2 + (py - gy) ** 2)
+        objetivo = getattr(obs, "goal", None)
+        if objetivo is not None:
+            gx, gy = objetivo
+            dist_atual = math.sqrt((px - gx) ** 2 + (py - gy) ** 2)
         else:
             gx = gy = None
-            dist_current = None
+            dist_atual = None
 
         for dy in range(-alcance, alcance + 1):
             for dx in range(-alcance, alcance + 1):
                 if dx == 0 and dy == 0:
                     continue
 
-                pos_check = (px + dx, py + dy)
-                objeto = next((p for p in percepcoes if tuple(p["pos"]) == pos_check), None)
+                pos_verificar = (px + dx, py + dy)
+                objeto = next((p for p in percepcoes if tuple(p["pos"]) == pos_verificar), None)
 
                 if objeto:
                     tipo = objeto.get("tipo", "")
                     if tipo == "obstaculo":
-                        features.append(-0.9)
+                        caracteristicas.append(-0.9)
                     elif tipo in ("recurso", "farol"):
                         if getattr(obs, "carga", 0) <= 0:
-                            features.append(0.9)
+                            caracteristicas.append(0.9)
                         else:
-                            features.append(0.1)
+                            caracteristicas.append(0.1)
                     elif tipo == "ninho":
                         if getattr(obs, "carga", 0) > 0:
-                            features.append(1.0)
+                            caracteristicas.append(1.0)
                         else:
-                            features.append(0.1)
+                            caracteristicas.append(0.1)
                     else:
-                        features.append(0.0)
+                        caracteristicas.append(0.0)
                 else:
                     if gx is not None and gy is not None:
-                        dist_cell = math.sqrt((pos_check[0] - gx) ** 2 + (pos_check[1] - gy) ** 2)
-                        if dist_cell < dist_current:
-                            features.append(0.9)
+                        dist_celula = math.sqrt((pos_verificar[0] - gx) ** 2 + (pos_verificar[1] - gy) ** 2)
+                        if dist_celula < dist_atual:
+                            caracteristicas.append(0.9)
                         else:
-                            features.append(-0.9)
+                            caracteristicas.append(-0.9)
                     else:
-                        features.append(-0.9)
+                        caracteristicas.append(-0.9)
 
-        return features
+        return caracteristicas
 
-    def build_nn_input(self, obs):
+    def construir_entrada_rn(self, obs):
         px, py = obs.posicao
-        features = np.array(self.surroundings(), dtype=np.float32)
+        caracteristicas = np.array(self.vizinhanca(), dtype=np.float32)
 
         largura = max(1.0, getattr(obs, "largura", 1))
         altura = max(1.0, getattr(obs, "altura", 1))
@@ -200,30 +188,30 @@ class AgenteAprendizagem(Agente):
         norm_x = px / largura
         norm_y = py / altura
 
-        goal = getattr(obs, "goal", None)
-        if goal is not None:
-            gx, gy = goal
-            goal_x = (gx - px) / largura
-            goal_y = (gy - py) / altura
+        objetivo = getattr(obs, "goal", None)
+        if objetivo is not None:
+            gx, gy = objetivo
+            obj_x = (gx - px) / largura
+            obj_y = (gy - py) / altura
         else:
-            goal_x = 0.0
-            goal_y = 0.0
+            obj_x = 0.0
+            obj_y = 0.0
 
-        carrying = float(getattr(obs, "carga", 0) > 0)
+        carregando = float(getattr(obs, "carga", 0) > 0)
 
-        return np.concatenate(([norm_x, norm_y], features, [goal_x, goal_y, carrying])).astype(np.float32)
+        return np.concatenate(([norm_x, norm_y], caracteristicas, [obj_x, obj_y, carregando])).astype(np.float32)
 
-    def get_input_size(self):
+    def obter_tamanho_entrada(self):
         alcance = self.sensores.alcance
-        num_features = (2 * alcance + 1) ** 2 - 1
-        return int(num_features + 5)
+        num_caracteristicas = (2 * alcance + 1) ** 2 - 1
+        return int(num_caracteristicas + 5)
 
     def set_action_space(self, nomes_accao):
         self.nomes_accao = list(nomes_accao)
 
-    def __move_toward_action(self, target, current):
-        tx, ty = target
-        cx, cy = current
+    def __acao_mover_para(self, alvo, atual):
+        tx, ty = alvo
+        cx, cy = atual
         dx = tx - cx
         dy = ty - cy
 
@@ -237,9 +225,4 @@ class AgenteAprendizagem(Agente):
                 return "baixo"
             elif dy < 0:
                 return "cima"
-
         return "ficar"
-
-
-
-

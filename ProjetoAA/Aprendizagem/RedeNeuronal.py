@@ -1,160 +1,157 @@
 import random
 import numpy as np
 
-def compute_layer_outputs(inputs, weights, biases, activation_function):
-    z = np.dot(inputs, weights) + biases
-    outputs = activation_function(z)
-    return outputs
+def computar_saidas_camada(entradas, pesos, vies, funcao_ativacao):
+    z = np.dot(entradas, pesos) + vies
+    saidas = funcao_ativacao(z)
+    return saidas
 
-def create_network_architecture(input_size, output_size, neurons):
-    nn = RedeNeuronal(input_size, output_size, neurons, hidden_activation=relu, output_activation=output_fn)
-    num_weights = nn.compute_num_weights()
-    weights = [random.uniform(-1, 1) for _ in range(num_weights)]
-    nn.load_weights(weights)
-
-    return nn
+def criar_arquitetura_rede(tamanho_entrada, tamanho_saida, neuronios):
+    rn = RedeNeuronal(tamanho_entrada, tamanho_saida, neuronios, ativacao_oculta=relu, ativacao_saida=funcao_saida)
+    num_pesos = rn.calcular_numero_pesos()
+    pesos = [random.uniform(-1, 1) for _ in range(num_pesos)]
+    rn.carregar_pesos(pesos)
+    return rn
 
 def relu(x):
     return np.maximum(0, x)
 
-def output_fn(x):
+def funcao_saida(x):
     return x
 
 class RedeNeuronal:
 
-    def __init__(self, input_size, output_size, hidden_architecture, hidden_activation, output_activation):
-        self.output_weights = None
-        self.output_bias = None
-        self.hidden_weights = None
-        self.hidden_biases = None
-        self.input_size = input_size
+    def __init__(self, tamanho_entrada, tamanho_saida, arquitetura_oculta, ativacao_oculta, ativacao_saida):
+        self.pesos_saida = None
+        self.vies_saida = None
+        self.pesos_ocultos = None
+        self.vies_ocultos = None
+        self.tamanho_entrada = tamanho_entrada
+        self.arquitetura_oculta = arquitetura_oculta
+        self.ativacao_oculta = ativacao_oculta
+        self.ativacao_saida = ativacao_saida
+        self.tamanho_saida = tamanho_saida
+        self.pesos = None
 
-        self.hidden_architecture = hidden_architecture
+    def calcular_numero_pesos(self):
+        num_pesos = 0
+        tamanho_atual = self.tamanho_entrada
+        for camada_n in self.arquitetura_oculta:
+            num_pesos += (tamanho_atual + 1) * camada_n
+            tamanho_atual = camada_n
+        num_pesos += (tamanho_atual + 1) * self.tamanho_saida
+        return num_pesos
 
-        self.hidden_activation = hidden_activation
-        self.output_activation = output_activation
-        self.output_size = output_size
-        self.weights = None
+    def carregar_pesos(self, pesos):
+        w = np.array(pesos)
+        self.pesos = w
+        self.pesos_ocultos = []
+        self.vies_ocultos = []
 
-    def compute_num_weights(self):
-        num_weights = 0
-        input_size = self.input_size
-        for hidden_layer_n in self.hidden_architecture:
-            num_weights += (input_size+1) * hidden_layer_n
-            input_size = hidden_layer_n
-        num_weights += (input_size + 1) * self.output_size
-        return num_weights
+        inicio_w = 0
+        tamanho_atual = self.tamanho_entrada
+        for n in self.arquitetura_oculta:
+            fim_w = inicio_w + (tamanho_atual + 1) * n
+            if fim_w > w.size:
+                raise ValueError(f"carregar_pesos: tamanho insuficiente do vetor de pesos (necessário {fim_w}, obtido {w.size})")
+            self.vies_ocultos.append(w[inicio_w:inicio_w + n])
+            self.pesos_ocultos.append(w[inicio_w + n:fim_w].reshape(tamanho_atual, n))
+            inicio_w = fim_w
+            tamanho_atual = n
 
-    def load_weights(self, weights):
-        w = np.array(weights)
-        self.weights = w
-        self.hidden_weights = []
-        self.hidden_biases = []
+        fim_w = inicio_w + (tamanho_atual + 1) * self.tamanho_saida
+        if fim_w > w.size:
+            raise ValueError(f"carregar_pesos: tamanho insuficiente do vetor de pesos (necessário {fim_w}, obtido {w.size})")
+        self.vies_saida = w[inicio_w:inicio_w + self.tamanho_saida]
+        self.pesos_saida = w[inicio_w + self.tamanho_saida:fim_w].reshape(tamanho_atual, self.tamanho_saida)
 
-        start_w = 0
-        input_size = self.input_size
-        for n in self.hidden_architecture:
-            end_w = start_w + (input_size + 1) * n
-            if end_w > w.size:
-                raise ValueError(f"load_weights: tamanho insuficiente do vector de pesos (need {end_w}, got {w.size})")
-            self.hidden_biases.append(w[start_w:start_w + n])
-            self.hidden_weights.append(w[start_w + n:end_w].reshape(input_size, n))
-            start_w = end_w
-            input_size = n
-
-        end_w = start_w + (input_size + 1) * self.output_size
-        if end_w > w.size:
-            raise ValueError(f"load_weights: tamanho insuficiente do vector de pesos (need {end_w}, got {w.size})")
-        self.output_bias = w[start_w:start_w + self.output_size]
-        self.output_weights = w[start_w + self.output_size:end_w].reshape(input_size, self.output_size)
-
-    def forward(self, x):
+    def propagar(self, x):
         a = x
-        for weights, bias in zip(self.hidden_weights, self.hidden_biases):
-            a = compute_layer_outputs(a, weights, bias, self.hidden_activation)
-        output = compute_layer_outputs(a, self.output_weights, self.output_bias, self.output_activation)
-        return output
+        for pesos, vies in zip(self.pesos_ocultos, self.vies_ocultos):
+            a = computar_saidas_camada(a, pesos, vies, self.ativacao_oculta)
+        saida = computar_saidas_camada(a, self.pesos_saida, self.vies_saida, self.ativacao_saida)
+        return saida
 
-    def forward_with_cache(self, x):
-        activations = [x]
+    def propagar_com_cache(self, x):
+        ativacoes = [x]
         zs = []
 
         a = x
-        for W, b in zip(self.hidden_weights, self.hidden_biases):
+        for W, b in zip(self.pesos_ocultos, self.vies_ocultos):
             z = np.dot(a, W) + b
             zs.append(z)
-            a = self.hidden_activation(z)
-            activations.append(a)
+            a = self.ativacao_oculta(z)
+            ativacoes.append(a)
 
-        z = np.dot(a, self.output_weights) + self.output_bias
+        z = np.dot(a, self.pesos_saida) + self.vies_saida
         zs.append(z)
-        a = self.output_activation(z)
-        activations.append(a)
+        a = self.ativacao_saida(z)
+        ativacoes.append(a)
 
-        return a, activations, zs
+        return a, ativacoes, zs
 
-    def compute_gradients(self, x, target):
+    def calcular_gradientes(self, x, alvo):
+        output, ativacoes, zs = self.propagar_com_cache(x)
 
-        output, activations, zs = self.forward_with_cache(x)
-
-        def hidden_deriv(z):
+        def derivada_oculta(z):
             return np.where(z > 0, 1.0, 0.01)
 
-        def output_deriv():
+        def derivada_saida():
             return 1
 
-        delta = (output - target) * output_deriv()
+        delta = (output - alvo) * derivada_saida()
 
-        grad_output_W = np.outer(activations[-2], delta)
-        grad_output_b = delta
+        grad_saida_W = np.outer(ativacoes[-2], delta)
+        grad_saida_b = delta
 
-        grad_hidden_W = []
-        grad_hidden_b = []
+        grad_oculto_W = []
+        grad_oculto_b = []
 
         delta_l = delta
 
-        for layer in reversed(range(len(self.hidden_weights))):
-            z = zs[layer]
-            a_prev = activations[layer]
+        # Iterar de trás para frente nas camadas ocultas
+        for camada in reversed(range(len(self.pesos_ocultos))):
+            z = zs[camada]
+            a_prev = ativacoes[camada]
 
-            d_act = hidden_deriv(z)
+            d_act = derivada_oculta(z)
 
-            if layer == len(self.hidden_weights) - 1:
-                W_next = self.output_weights
+            if camada == len(self.pesos_ocultos) - 1:
+                W_prox = self.pesos_saida
             else:
-                W_next = self.hidden_weights[layer + 1]
+                W_prox = self.pesos_ocultos[camada + 1]
 
-            delta_l = np.dot(delta_l, W_next.T) * d_act
+            delta_l = np.dot(delta_l, W_prox.T) * d_act
 
             grad_W_l = np.outer(a_prev, delta_l)
             grad_b_l = delta_l
 
-            grad_hidden_W.insert(0, grad_W_l)
-            grad_hidden_b.insert(0, grad_b_l)
+            grad_oculto_W.insert(0, grad_W_l)
+            grad_oculto_b.insert(0, grad_b_l)
 
         grads = []
-        for Wg, bg in zip(grad_hidden_W, grad_hidden_b):
+        for Wg, bg in zip(grad_oculto_W, grad_oculto_b):
             grads.extend(bg.flatten())
             grads.extend(Wg.flatten())
-        grads.extend(grad_output_b.flatten())
-        grads.extend(grad_output_W.flatten())
+        grads.extend(grad_saida_b.flatten())
+        grads.extend(grad_saida_W.flatten())
 
         return np.array(grads)
 
-    def flatten_params(self):
-        return np.concatenate([w.flatten() for w in self.weights])
+    def achatar_params(self):
+        return np.concatenate([w.flatten() for w in self.pesos])
 
-    def unflatten_params(self, flat_params):
-        new_weights = []
+    def desachatar_params(self, params_achatados):
+        novos_pesos = []
         idx = 0
-        for w in self.weights:
-            size = w.size
-            new_w = flat_params[idx:idx + size].reshape(w.shape)
-            new_weights.append(new_w)
-            idx += size
-        self.weights = new_weights
+        for w in self.pesos:
+            tamanho = w.size
+            novo_w = params_achatados[idx:idx + tamanho].reshape(w.shape)
+            novos_pesos.append(novo_w)
+            idx += tamanho
+        self.pesos = novos_pesos
 
-    def flatten_grads(self, grads):
+    def achatar_grads(self, grads):
         return np.concatenate([g.flatten() for g in grads])
 
 
@@ -168,16 +165,16 @@ class Adam:
 
             self.m = np.zeros_like(params)
             self.v = np.zeros_like(params)
-            self.steps = 0
+            self.passos = 0
 
     def step(self, grads):
-            self.steps += 1
+            self.passos += 1
 
             self.m = self.beta1 * self.m + (1 - self.beta1) * grads
 
             self.v = self.beta2 * self.v + (1 - self.beta2) * (grads * grads)
 
-            m_hat = self.m / (1 - self.beta1 ** self.steps)
-            v_hat = self.v / (1 - self.beta2 ** self.steps)
+            m_hat = self.m / (1 - self.beta1 ** self.passos)
+            v_hat = self.v / (1 - self.beta2 ** self.passos)
 
             self.params -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
