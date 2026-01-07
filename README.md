@@ -1,6 +1,6 @@
 # Projeto AA
 
-Um projeto baseado em agentedf autónomos com capacidades de aprendizagem (DQN, Genético).  
+Um projeto baseado em agentes autónomos com capacidades de aprendizagem (DQN, Genético).  
 Trabalhando em dois tipos de ambientes (Farol,Foraging).
 
 ## Estrutura
