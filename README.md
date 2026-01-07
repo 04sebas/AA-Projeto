@@ -1,36 +1,69 @@
-# AA Project
+# Projeto AA
 
-This project is an agent-based simulation framework with learning capabilities (DQN, Genetic Algorithms).
-It works with different environments (Lighthouse, Foraging).
+Um projeto baseado em agentedf autonomos com capacidades de aprendizagem (DQN, Genético).
+Trabalhando em dois tipos de ambientes (Farol,Foraging).
 
-## Structure
+## Estrutura
 
-- `aa_project/`: Source code.
-  - `agents/`: Agent implementations (Fixed, Learning).
-  - `environments/`: Environment logic.
-  - `learning/`: Learning strategies (DQN, Genetic, Neural Network).
-  - `objects/`: Simulation objects (Sensor, Action, Observation).
-  - `simulation_engine.py`: Main engine.
-  - `map_creation.py`: Script to generate configuration files.
+- `ProjetoAA/`: Código Source.
+  - `Agents/`: Implementação dos Agentes (Fixos, Aprendizagem).
+  - `Environments/`: Lógica dos Ambientes.
+  - `Learning/`: Estratégias de Aprendizagem (DQN, Genético, Rede Neuronal).
+  - `Objects/`: Objetos da Simulação (Sensores, Ações, Observações).
+  - `SimulationEngine.py`: MotorDeSimulação.
+  - `MapCreation.py`: Criação de Mapas.
 
-## Running the Simulation
+## MotorDeSimulação
 
-1. **Generate Configuration**:
-   Run `aa_project/map_creation.py` to generate `simulator_foraging.json`.
-   ```bash
-   python aa_project/map_creation.py
-   ```
+ Para executar a simulação, esta é feita no:
+ ```bash
+ SimulationEngine.py
+ ```
 
-2. **Run Simulation**:
-   You can run the simulation engine directly or via a script.
-   To verify the setup and training split:
-   ```bash
-   python verify_split.py
-   ```
+ Vamos analisar o main:
+ ```bash
+ if __name__ == "__main__":
+  simulator = SimulationEngine().create("simulador_foraging.json")
+  if simulator.active:
+      file_map = {
+          2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
+          3: "models/ForagingEnvironment_agent3_dqn_v1.pkl"
+      }
+      # summary = simulator.load_networks_summary(file_map=file_map, agents=[2,3])
+      # results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
+      # simulator.training_phase()
+      simulator.testing_phase()
+      # simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
+  ```
 
-## SimulationEngine
+ i) Altera-se o Ambiente <Ficheiro.json>:
+ simulator = SimulationEngine().create(<Ficheiro.json>)
 
-The `SimulationEngine` is the core class responsible for managing the simulation lifecycle. It orchestrates the environment, agents, and learning processes.
+ ## (Opcional)
+ ii) Pode-se utilizar agentes já criados em .pk e assim adicionamos a este mapa, com o respetivo número [n1,n2,...]:
+ Caso adicione agentes com o seu index, também o terá que adicionar no agents=[n1,n2,...], nos argumentos do .load_networks_summary().
+ file_map = {
+          2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
+          3: "models/ForagingEnvironment_agent3_dqn_v1.pkl"
+      }
+ summary = simulator.load_networks_summary(file_map=file_map, agents=[2,3])
+ 
+ ## (Opcional)
+ iii) Caso queriamos testar várias simulações, com certos agentes definidos no passo ii) utilizamos o run_experiments():
+ Este apenas vai nos dar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram recolhidos e depositados.
+ results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
+ 
+## (Opcional)
+ iv) Fase de treino para os agentes no <Ficheiro.json>:
+ simulator.training_phase()
+ 
+ v) Fase de testes para os agentes anteriormente escolhidos (file_map, ou <Ficheiro.json>):
+ simulator.testing_phase()
+ 
+## (Opcional)
+ vi) Criação de um gif para visualização do percurso dos agentes:
+ Pode demorar um bom tempo se forem demasiados passos.
+ simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
 
 ### Key Methods:
 
