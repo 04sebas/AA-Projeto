@@ -21,7 +21,7 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
  ```
 
  Vamos analisar o main:
- Todos os passos com (Opcional), podem ser comentados caso não sejam utilizados.
+ - Todos os passos com (Opcional), podem ser comentados caso não sejam utilizados.
  ```bash
  if __name__ == "__main__":
   simulator = SimulationEngine().create("simulador_foraging.json")
@@ -37,14 +37,15 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
       simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
   ```
 
- i) Altera-se o Ambiente <Ficheiro.json>:
+ i) Criação do Ambiente <Ficheiro.json>:
  ```bash
  simulator = SimulationEngine().create(<Ficheiro.json>)
 ```
 
  **(Opcional)**
- ii) Pode-se utilizar agentes já criados em .pk e assim adicionamos a este mapa, com o respetivo número [n1,n2,...]:
- Caso adicione agentes com o seu index, também o terá que adicionar no agents=[n1,n2,...], nos argumentos do .load_networks_summary().
+ ii) Adicionar Agentes já treinados:
+ - Pode-se utilizar agentes já criados em .pk e assim adicionamos a este mapa, com o respetivo número [n1,n2,...].
+ - Caso adicione agentes com o seu index, também o terá que adicionar no agents=[n1,n2,...], nos argumentos do .load_networks_summary().
  ```bash
  file_map = {
           2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
@@ -54,8 +55,9 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 ```
  
  **(Opcional)**
- iii) Caso queriamos testar várias simulações, com certos agentes definidos no passo ii) utilizamos o run_experiments():
- Este apenas vai nos dar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram recolhidos e depositados.
+ iii) Múltiplas Simulações:
+ - Caso seja necessário testar várias simulações, com certos agentes definidos no passo ii) utiliza-se o run_experiments().
+ - Este apenas vai criar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram Recolhidos e Depositados.
 ```bash
  results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
 ```
@@ -65,14 +67,15 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
  simulator.training_phase()
  ```
 
- v) - Fase de testes para os agentes anteriormente escolhidos (file_map, ou <Ficheiro.json>):
+ v) Fase de testes para os agentes anteriormente escolhidos (file_map, ou <Ficheiro.json>):
  ```bash
  simulator.testing_phase()
 ```
  
 **(Opcional)**
- vi) Criação de um gif para visualização do percurso dos agentes:
- Pode demorar um tempo se forem demasiados passos e altere o <nome_do_gif>.
+ vi) Criação de GIF:
+ - Criação de um gif para visualização do percurso dos agentes:
+ - Pode demorar um tempo se forem demasiados passos e altere o <nome_do_gif>.
 ```bash
  simulator.save_animation_gif("models/<nome_do_gif>.gif", fps=12, trail_len=30)
 ```
