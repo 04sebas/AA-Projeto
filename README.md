@@ -1,6 +1,6 @@
 # Projeto AA
 
-Um projeto baseado em agentedf autonomos com capacidades de aprendizagem (DQN, Genético).
+Um projeto baseado em agentedf autónomos com capacidades de aprendizagem (DQN, Genético).
 Trabalhando em dois tipos de ambientes (Farol,Foraging).
 
 ## Estrutura
@@ -42,8 +42,8 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 ```
 
  **(Opcional)**
- ii) - Pode-se utilizar agentes já criados em .pk e assim adicionamos a este mapa, com o respetivo número [n1,n2,...]:
- - Caso adicione agentes com o seu index, também o terá que adicionar no agents=[n1,n2,...], nos argumentos do .load_networks_summary().
+ ii) Pode-se utilizar agentes já criados em .pk e assim adicionamos a este mapa, com o respetivo número [n1,n2,...]:
+ Caso adicione agentes com o seu index, também o terá que adicionar no agents=[n1,n2,...], nos argumentos do .load_networks_summary().
  ```bash
  file_map = {
           2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
@@ -53,13 +53,13 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 ```
  
  **(Opcional)**
- iii) - Caso queriamos testar várias simulações, com certos agentes definidos no passo ii) utilizamos o run_experiments():
- - Este apenas vai nos dar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram recolhidos e depositados.
+ iii) Caso queriamos testar várias simulações, com certos agentes definidos no passo ii) utilizamos o run_experiments():
+ Este apenas vai nos dar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram recolhidos e depositados.
 ```bash
  results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
 ```
 **(Opcional)**
- iv) - Fase de treino para os agentes no <Ficheiro.json>:
+ iv) Fase de treino para os agentes no <Ficheiro.json>:
  ```bash
  simulator.training_phase()
  ```
@@ -70,10 +70,10 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 ```
  
 **(Opcional)**
- vi) - Criação de um gif para visualização do percurso dos agentes:
- - Pode demorar um bom tempo se forem demasiados passos.
+ vi) Criação de um gif para visualização do percurso dos agentes:
+ Pode demorar um tempo se forem demasiados passos e altere o <nome_do_gif>.
 ```bash
- simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
+ simulator.save_animation_gif("models/<nome_do_gif>.gif", fps=12, trail_len=30)
 ```
 
 ### Key Methods:
