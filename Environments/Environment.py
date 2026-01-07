@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import random
-from ProjetoAA.Agents.Agent import Agent
-from ProjetoAA.Objects.Action import Action
-from ProjetoAA.Objects.Observation import Observation
+from Agents.Agent import Agent
+from Objects.Action import Action
+from Objects.Observation import Observation
 
 
 class Environment(ABC):

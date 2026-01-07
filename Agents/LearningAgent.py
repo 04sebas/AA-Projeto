@@ -1,8 +1,8 @@
 import math
 import random
 import numpy as np
-from ProjetoAA.Agents.Agent import Agent
-from ProjetoAA.Objects.Action import Action
+from Agents.Agent import Agent
+from Objects.Action import Action
 
 class LearningAgent(Agent):
     def __init__(self, name="LA", policy=None, position=None, action_names=None):

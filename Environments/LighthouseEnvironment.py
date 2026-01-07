@@ -1,6 +1,6 @@
-from ProjetoAA.Environments.Environment import Environment
-from ProjetoAA.Objects.Observation import Observation
-from ProjetoAA.Learning.Policies import DIRECTIONS
+from Environments.Environment import Environment
+from Objects.Observation import Observation
+from Learning.Policies import DIRECTIONS
 
 class LighthouseEnvironment(Environment):
     def __init__(self, width=100, height=100, lighthouse_pos=(50,75), obstacles=None):

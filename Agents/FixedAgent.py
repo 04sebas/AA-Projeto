@@ -1,8 +1,8 @@
 import json
-from ProjetoAA.Agents.Agent import Agent
-from ProjetoAA.Learning.Policies import DIRECTIONS, random_policy, greedy_policy
-from ProjetoAA.Objects.Action import Action
-from ProjetoAA.Objects.Observation import Observation
+from Agents.Agent import Agent
+from Learning.Policies import DIRECTIONS, random_policy, greedy_policy
+from Objects.Action import Action
+from Objects.Observation import Observation
 
 class FixedAgent(Agent):
     def __init__(self, position=None, policy=None, name="FA"):

@@ -5,13 +5,12 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 
 ## Estrutura
 
-- `ProjetoAA/`: Código Source.
-  - `Agents/`: Implementação dos Agentes (Fixos, Aprendizagem).
-  - `Environments/`: Lógica dos Ambientes.
-  - `Learning/`: Estratégias de Aprendizagem (DQN, Genético, Rede Neuronal).
-  - `Objects/`: Objetos da Simulação (Sensores, Ações, Observações).
-  - `SimulationEngine.py`: MotorDeSimulação.
-  - `MapCreation.py`: Criação de Mapas.
+- `Agents/`: Implementação dos Agentes (Fixos, Aprendizagem).
+- `Environments/`: Lógica dos Ambientes.
+- `Learning/`: Estratégias de Aprendizagem (DQN, Genético, Rede Neuronal).
+- `Objects/`: Objetos da Simulação (Sensores, Ações, Observações).
+- `SimulationEngine.py`: MotorDeSimulação.
+- `MapCreation.py`: Criação de Mapas.
 
 ## MotorDeSimulação
 

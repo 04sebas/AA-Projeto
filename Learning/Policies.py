@@ -2,7 +2,7 @@ import math
 import heapq
 import random
 
-from ProjetoAA.Objects.Action import Action
+from Objects.Action import Action
 
 DIRECTIONS = {
     "up": (0, -1),

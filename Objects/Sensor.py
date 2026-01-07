@@ -36,7 +36,7 @@ class Sensor:
                     visible_objects.append({"type": "nest", "pos": pos})
 
                 if hasattr(environment, "positions"):
-                    from ProjetoAA.Agents.LearningAgent import LearningAgent
+                    from Agents.LearningAgent import LearningAgent
                     for agent, agent_pos in environment.positions.items():
                         if (
                             agent_pos == pos

@@ -2,10 +2,10 @@ import math
 import random
 from collections import deque
 import numpy as np
-from ProjetoAA.Agents.LearningAgent import LearningAgent
-from ProjetoAA.Learning.NeuralNetwork import create_network_architecture, Adam
-from ProjetoAA.Objects.Action import Action
-from ProjetoAA.Learning.LearningStrategy import LearningStrategy
+from Agents.LearningAgent import LearningAgent
+from Learning.NeuralNetwork import create_network_architecture, Adam
+from Objects.Action import Action
+from Learning.LearningStrategy import LearningStrategy
 
 
 class QLearningStrategy(LearningStrategy):

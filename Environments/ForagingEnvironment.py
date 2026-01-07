@@ -1,10 +1,10 @@
 import math
 from copy import deepcopy
-from ProjetoAA.Agents.Agent import Agent
-from ProjetoAA.Environments.Environment import Environment
-from ProjetoAA.Learning.Policies import DIRECTIONS
-from ProjetoAA.Objects.Action import Action
-from ProjetoAA.Objects.Observation import Observation
+from Agents.Agent import Agent
+from Environments.Environment import Environment
+from Learning.Policies import DIRECTIONS
+from Objects.Action import Action
+from Objects.Observation import Observation
 
 class ForagingEnvironment(Environment):
     def __init__(self, width=50, height=50, resources=None, nests=None, obstacles=None):

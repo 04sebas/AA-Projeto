@@ -1,10 +1,10 @@
 import random
 import numpy as np
-from ProjetoAA.Agents.LearningAgent import LearningAgent
-from ProjetoAA.Environments.LighthouseEnvironment import LighthouseEnvironment
-from ProjetoAA.Objects.Action import Action
-from ProjetoAA.Learning.NeuralNetwork import create_network_architecture
-from ProjetoAA.Learning.LearningStrategy import LearningStrategy
+from Agents.LearningAgent import LearningAgent
+from Environments.LighthouseEnvironment import LighthouseEnvironment
+from Objects.Action import Action
+from Learning.NeuralNetwork import create_network_architecture
+from Learning.LearningStrategy import LearningStrategy
 
 
 class GeneticStrategy(LearningStrategy):

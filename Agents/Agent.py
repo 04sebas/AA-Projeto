@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from ProjetoAA.Objects.Sensor import Sensor
-from ProjetoAA.Objects.Action import Action
+from Objects.Sensor import Sensor
+from Objects.Action import Action
 
 class Agent(ABC):
     def __init__(self, pos, name, policy=None):

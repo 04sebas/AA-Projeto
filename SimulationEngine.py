@@ -2,12 +2,12 @@ import json
 import numpy as np
 
 from matplotlib import pyplot as plt
-from ProjetoAA.Agents.LearningAgent import LearningAgent
-from ProjetoAA.Agents.FixedAgent import FixedAgent
-from ProjetoAA.Environments.LighthouseEnvironment import LighthouseEnvironment
-from ProjetoAA.Environments.ForagingEnvironment import ForagingEnvironment
-from ProjetoAA.Learning.GeneticStrategy import GeneticStrategy
-from ProjetoAA.Learning.QLearningStrategy import QLearningStrategy
+from Agents.LearningAgent import LearningAgent
+from Agents.FixedAgent import FixedAgent
+from Environments.LighthouseEnvironment import LighthouseEnvironment
+from Environments.ForagingEnvironment import ForagingEnvironment
+from Learning.GeneticStrategy import GeneticStrategy
+from Learning.QLearningStrategy import QLearningStrategy
 
 
 def _save_best_nn(environment, agent_index, weights, nn_object, nn_arch=None, output_folder="models", type_str="genetic"):
@@ -192,7 +192,7 @@ class SimulationEngine:
 
     def load_network(self, file_path, agent_index):
         import pickle, os
-        from ProjetoAA.Learning.NeuralNetwork import NeuralNetwork, relu, output_function
+        from Learning.NeuralNetwork import NeuralNetwork, relu, output_function
 
         base = os.path.dirname(__file__)
         full_path = os.path.join(base, file_path)
