@@ -1,6 +1,6 @@
 # Projeto AA
 
-Um projeto baseado em agentedf autónomos com capacidades de aprendizagem (DQN, Genético).
+Um projeto baseado em agentedf autónomos com capacidades de aprendizagem (DQN, Genético).  
 Trabalhando em dois tipos de ambientes (Farol,Foraging).
 
 ## Estrutura
@@ -80,38 +80,68 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
  simulator.save_animation_gif("models/<nome_do_gif>.gif", fps=12, trail_len=30)
 ```
 
-### Key Methods:
+### Configuração (`.json`):
 
-*   **`create(param_filename)`**: Initializes the simulation using a JSON configuration file. It sets up the environment (width, height, obstacles), agents (types, policies), and strategy configurations.
-*   **`training_phase()`**: Executes the training loop for learning agents.
-    *   Generates a 70/30 train/test split of initial positions.
-    *   Trains agents using the specified strategy (e.g., Genetic Algorithm, DQN) using *only* the training set.
-    *   Saves the best performing neural network models to the `models/` directory.
-    *   Automatically validates performance on the test set to ensure generalization.
-*   **`testing_phase()`**: Loads the test dataset (unseen during training) and evaluates the agents' performance.
-    *   Crucial for verifying that agents haven't just memorized the training positions.
-    *   Produces performance plots and fitness statistics.
-*   **`run(max_steps)`**: Runs a single simulation episode (usually for visualization or debugging).
-*   **`visualize_paths()`**: Generates plots showing agent trajectories, resources collected, and environment layout using Matplotlib.
+O MotorDeSimulação utiliza ficheiros JSON para definir os Ambientes e Agentes:
+*   **`environment`**: Tipo (`LighthouseEnvironment`, `ForagingEnvironment`), dimensões, e objetos.
+*   **`agents`**: Lista de agentes, os seus tipos (`LearningAgent`, `FixedAgent`), quantidade e definições da estratégia.
+*   **`simulator`**: Definições globais do tipo `max_steps` e `visualization`.
 
-### Configuration (`.json`):
+**Exemplo de Ambiente:**
+```bash
+"simulator": {
+        "max_steps": 1000,
+        "visualization": True
+    },
+    "environment": {
+        "type": "ForagingEnvironment",
+        "width": 50,
+        "height": 50,
+        "resources": [
+            {"pos": [5, 5], "quantity": 5, "value": 10},
+            {"pos": [40, 5], "quantity": 8, "value": 20},
+            {"pos": [10, 20], "quantity": 12, "value": 8},
+            {"pos": [25, 25], "quantity": 10, "value": 15},
+            {"pos": [35, 35], "quantity": 15, "value": 25},
+            {"pos": [5, 40], "quantity": 10, "value": 10},
+            {"pos": [45, 45], "quantity": 5, "value": 30},
 
-The engine depends on a JSON config file defining:
-*   **`environment`**: Type (`LighthouseEnvironment`, `ForagingEnvironment`), dimensions, and objects.
-*   **`agents`**: List of agents, their types (`LearningAgent`, `FixedAgent`), quantity, and strategy settings.
-*   **`simulator`**: Global settings like `max_steps` and `visualization`.
-
-## Features
-
-- **Environments**: Lighthouse (Navigation), Foraging (Resource Collection).
-- **Learning**:
-  - **DQN**: Deep Q-Learning with Double DQN and Experience Replay.
-  - **Genetic**: Genetic Algorithm with Tournament Selection, Elitism, and multiple evaluation trials.
-- **Split**: Automatic 70/30 Train/Test split for generalization testing.
-
-## Recent Updates
-
-- Translated codebase from Portuguese to English.
-- Implemented Double DQN for stability.
-- Improved Genetic Algorithm with averaged evaluations.
-- Added automatic Test Set generation.
+            {"pos": [20, 10], "quantity": 7, "value": 12},
+            {"pos": [30, 15], "quantity": 9, "value": 18},
+            {"pos": [15, 30], "quantity": 14, "value": 9},
+            {"pos": [42, 28], "quantity": 11, "value": 14},
+            {"pos": [10, 45], "quantity": 6, "value": 22},
+            {"pos": [25, 5], "quantity": 5, "value": 11},
+            {"pos": [45, 10], "quantity": 10, "value": 17}
+        ],
+        "nests": [
+            [3, 3],
+            [47, 47],
+            [3, 47],
+            [47, 3],
+            [25, 25]
+        ],
+        "obstacles": []
+    },
+    "agents": [
+        {
+            "type": "FixedAgent",
+            "quantity": 3,
+            "initial_position": "random",
+            "policy": {
+                "type": "greedy",
+                "range": 5,
+                "stuck_threshold": 3
+            }
+        },
+        {
+            "type": "LearningAgent",
+            "quantity": 1,
+            "initial_position": "random",
+            "strategy_type": "genetic",
+            "sensors": 3,
+            "trainable": True,
+            "base_name": "Genetic"
+        }
+    ]
+```
