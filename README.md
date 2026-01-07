@@ -80,7 +80,7 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
  simulator.save_animation_gif("models/<nome_do_gif>.gif", fps=12, trail_len=30)
 ```
 
-### Configuração (`.json`):
+## Configuração (`.json`):
 
 O MotorDeSimulação utiliza ficheiros JSON para definir os Ambientes e Agentes:
 *   **`environment`**: Tipo (`LighthouseEnvironment`, `ForagingEnvironment`), dimensões, e objetos.
