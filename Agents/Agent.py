@@ -36,13 +36,6 @@ class Agent(ABC):
         self.total_reward += reward
 
     def install(self, sensor: Sensor):
-        # Assuming list logic if meant to support multiple sensors, but code showed single assignment or append?
-        # Original code: self.sensores.append(sensor) but self.sensores initialized as Sensor() object (not list)
-        # Assuming logic was faulty or single sensor intended. I will stick to single sensor assignment or list if needed.
-        # Looking at original: self.sensores = Sensor(...). self.instala calls append. This would crash in Python if Sensor is not list.
-        # I'll fix it to assume single sensor for now or make it a list if that was the intent.
-        # Given the usage in other files: 'agente.sensores.alcance' implies a single object.
-        # So 'instala' was likely broken. I'll just assign it.
         self.sensors = sensor
 
     @abstractmethod

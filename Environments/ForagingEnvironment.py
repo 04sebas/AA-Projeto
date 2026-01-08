@@ -9,7 +9,10 @@ from Objects.Observation import Observation
 class ForagingEnvironment(Environment):
     def __init__(self, width=50, height=50, resources=None, nests=None, obstacles=None):
         self.initial_resources = {
-            tuple(r["pos"]): {"value": r["valor"], "quantity": r["quantidade"]}
+            tuple(r["pos"]): {
+                "value": r.get("value", r.get("valor", 1)),
+                "quantity": r.get("quantity", r.get("quantidade", 1))
+            }
             for r in (resources or [])
         }
         super().__init__(width, height, resources=deepcopy(self.initial_resources), obstacles=obstacles, name="ForagingEnvironment")

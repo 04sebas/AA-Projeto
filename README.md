@@ -82,7 +82,7 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 ## Configuração (`.json`):
 
 O MotorDeSimulação utiliza ficheiros JSON para definir os Ambientes e Agentes:
-*   **`environment`**: Tipo (`LighthouseEnvironment`, `ForagingEnvironment`), dimensões, e objetos.
+*   **`environment`**: Tipo (`FarolEnvironment`, `ForagingEnvironment`), dimensões, e objetos.
 *   **`agents`**: Lista de agentes, os seus tipos (`LearningAgent`, `FixedAgent`), quantidade e definições da estratégia.
 *   **`simulator`**: Definições globais do tipo `max_steps` e `visualization`.
 

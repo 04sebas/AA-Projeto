@@ -2,15 +2,15 @@ from Environments.Environment import Environment
 from Objects.Observation import Observation
 from Learning.Policies import DIRECTIONS
 
-class LighthouseEnvironment(Environment):
-    def __init__(self, width=100, height=100, lighthouse_pos=(50,75), obstacles=None):
-        super().__init__(width, height, obstacles=obstacles, name="LighthouseEnvironment")
-        self.lighthouse_pos = (int(lighthouse_pos[0]), int(lighthouse_pos[1]))
+class FarolEnvironment(Environment):
+    def __init__(self, width=100, height=100, farol_pos=(50,75), obstacles=None):
+        super().__init__(width, height, obstacles=obstacles, name="FarolEnvironment")
+        self.farol_pos = (int(farol_pos[0]), int(farol_pos[1]))
 
-        if self.lighthouse_pos in self.obstacles:
-            self.obstacles.discard(self.lighthouse_pos)
+        if self.farol_pos in self.obstacles:
+            self.obstacles.discard(self.farol_pos)
 
-        self.resources = {self.lighthouse_pos: {"type": "beacon", "pos": list(self.lighthouse_pos), "value": 1500, "quantity": 1}}
+        self.resources = {self.farol_pos: {"type": "beacon", "pos": list(self.farol_pos), "value": 1500, "quantity": 1}}
         self.raw_obstacles = [{"pos": [p[0], p[1]]} for p in self.obstacles]
         self.targets = {}
 
@@ -18,7 +18,7 @@ class LighthouseEnvironment(Environment):
         pos = tuple(self.positions.get(agent, (0, 0)))
         perceptions = agent.sensors.perceive(self, pos) or []
 
-        if pos == self.lighthouse_pos:
+        if pos == self.farol_pos:
             perceptions.append({
                 "type": "beacon",
                 "pos": pos
@@ -30,7 +30,7 @@ class LighthouseEnvironment(Environment):
         obs.height = self.height
         agent.last_obs = obs
         obs.load = 0
-        obs.goal = self.lighthouse_pos
+        obs.goal = self.farol_pos
         obs.foraging = False
         return obs
 
@@ -40,7 +40,7 @@ class LighthouseEnvironment(Environment):
         pos_raw = self.positions.get(agent, (0, 0))
         x, y = int(pos_raw[0]), int(pos_raw[1])
 
-        if (x, y) == self.lighthouse_pos:
+        if (x, y) == self.farol_pos:
             resource = self.resources.get((x, y))
             if resource:
                 agent.found_target = True
@@ -70,7 +70,7 @@ class LighthouseEnvironment(Environment):
         return reward
 
     def distance_to_target(self, x, y):
-        dist = abs(int(x) - self.lighthouse_pos[0]) + abs(int(y) - self.lighthouse_pos[1])
+        dist = abs(int(x) - self.farol_pos[0]) + abs(int(y) - self.farol_pos[1])
         max_dist = float(self.width + self.height) or 1.0
         return dist / max_dist
 

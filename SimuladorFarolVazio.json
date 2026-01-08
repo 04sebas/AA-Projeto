@@ -1,61 +1,73 @@
 {
-  "simulador": {
-    "max_passos": 500,
-    "visualizacao": true
+  "simulator": {
+    "max_steps": 500,
+    "visualization": true
   },
-
-  "ambiente": {
-    "tipo": "AmbienteFarol",
-    "largura": 100,
-    "altura": 100,
-    "pos_farol": [50, 75],
-    "obstaculos": []
+  "environment": {
+    "type": "FarolEnvironment",
+    "width": 100,
+    "height": 100,
+    "farol_pos": [
+      50,
+      75
+    ],
+    "obstacles": []
   },
-  "agentes": [
+  "agents": [
     {
-      "tipo": "AgenteFixo",
-      "quantidade": 1,
-      "posicao_inicial": "random",
+      "type": "FixedAgent",
+      "quantity": 1,
+      "initial_position": "random",
       "trainable": false,
-      "politica": {
-        "tipo": "greedy",
-        "alcance": 3
+      "policy": {
+        "type": "greedy",
+        "range": 3
       }
     },
     {
-      "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
-      "posicao_inicial": "random",
+      "type": "LearningAgent",
+      "quantity": 1,
+      "initial_position": "random",
       "trainable": true,
-      "tipo_estrategia": "genetica",
-      "politica": {
-        "alcance": 3
+      "strategy_type": "genetic",
+      "policy": {
+        "range": 3
       },
-      "estrategia_conf": {
-        "populacao_tamanho": 100,
-        "taxa_mutacao": 0.01,
-        "num_ger": 50,
-        "tamanho_torneio": 3,
-        "elitismo_frac": 0.2,
-        "hidden": [16, 8],
-        "passos_por_avaliacao": 1500,
+      "strategy_conf": {
+        "population_size": 100,
+        "mutation_rate": 0.01,
+        "num_generations": 50,
+        "tournament_size": 3,
+        "elitism_frac": 0.2,
+        "hidden": [
+          16,
+          8
+        ],
+        "steps_per_evaluation": 1500,
         "mutation_std": 0.1
       }
     },
-
     {
-      "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
-      "posicao_inicial": [[0,0]],
+      "type": "LearningAgent",
+      "quantity": 1,
+      "initial_position": [
+        [
+          0,
+          0
+        ]
+      ],
       "trainable": true,
-      "tipo_estrategia": "dqn",
-      "politica": {
-        "alcance": 3
+      "strategy_type": "dqn",
+      "policy": {
+        "range": 3
       },
-      "estrategia_conf": {
-        "hidden": [16, 8],
+      "strategy_conf": {
+        "hidden": [
+          16,
+          8
+        ],
         "episodes": 100,
-        "passos_por_ep": 1000,
+        "steps_per_ep": 1000,
         "gamma": 0.99,
         "epsilon": 0.7,
         "epsilon_min": 0.1,

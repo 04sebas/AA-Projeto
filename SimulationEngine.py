@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from Agents.LearningAgent import LearningAgent
 from Agents.FixedAgent import FixedAgent
-from Environments.LighthouseEnvironment import LighthouseEnvironment
+from Environments.FarolEnvironment import FarolEnvironment
 from Environments.ForagingEnvironment import ForagingEnvironment
 from Learning.GeneticStrategy import GeneticStrategy
 from Learning.QLearningStrategy import QLearningStrategy
@@ -92,6 +92,8 @@ class SimulationEngine:
         self.agent_history = {}
         self.reward_history = {}
         self.strategy_configs = []
+        self.training_positions = []
+        self.test_positions = []
 
     def list_agents(self):
         return self.agents
@@ -108,6 +110,10 @@ class SimulationEngine:
             self.visualization = sim_config.get("visualization", True)
             self.active = True
             self._config_file = param_filename
+            
+            # Generate dataset for training and testing
+            self.training_positions, self.test_positions = self.generate_train_test_dataset()
+            
             print(f"Simulation created successfully: {len(self.agents)} agents in environment")
         except FileNotFoundError:
             print(f"Error: File {param_filename} not found.")
@@ -118,13 +124,13 @@ class SimulationEngine:
         return self
 
     def _create_environment(self, env_config):
-        env_type = env_config.get("type", "LighthouseEnvironment")
+        env_type = env_config.get("type", "FarolEnvironment")
 
-        if env_type == "LighthouseEnvironment" or env_type == "AmbienteFarol":
-            self.environment = LighthouseEnvironment(
+        if env_type == "FarolEnvironment" or env_type == "AmbienteFarol" or env_type == "LighthouseEnvironment":
+            self.environment = FarolEnvironment(
                 width=env_config.get("width", 100),
                 height=env_config.get("height", 100),
-                lighthouse_pos=tuple(env_config.get("lighthouse_pos", [50, 75])),
+                farol_pos=tuple(env_config.get("farol_pos", env_config.get("lighthouse_pos", [50, 75]))),
                 obstacles=env_config.get("obstacles", [])
             )
         elif env_type == "ForagingEnvironment" or env_type == "AmbienteForaging":
@@ -322,45 +328,99 @@ class SimulationEngine:
         return {}
 
 
-    def generate_train_test_dataset(self, n_cases=100, train_ratio=0.7):
+    def generate_train_test_dataset(self, n_cases=None, train_ratio=0.7):
         """
         Generates a set of initial positions and splits them into train and test.
+        Respects exclusion zones around resources (5x5 area) and nests (2x2 area).
         Returns (train_list, test_list).
         """
         import random
+        if n_cases is None:
+            # Half of the map width as requested (100 -> 50, 50 -> 25)
+            n_cases = self.environment.width // 2
+            
         dataset = set()
         attempts = 0
-        max_attempts = n_cases * 10
+        max_attempts = n_cases * 100
         
+        # Get resource positions
+        resources_pos = []
+        if isinstance(self.environment.resources, dict):
+            resources_pos = list(self.environment.resources.keys())
+        elif isinstance(self.environment.resources, list):
+            resources_pos = [tuple(r["pos"]) for r in self.environment.resources]
+            
+        # Nests positions
+        nests_pos = getattr(self.environment, "nests", [])
+        
+        # Farol pos for FarolEnvironment (is a resource)
+        if hasattr(self.environment, "farol_pos"):
+            resources_pos.append(self.environment.farol_pos)
+
         while len(dataset) < n_cases and attempts < max_attempts:
-            pos = self.environment.random_position()
-            if isinstance(pos, list):
-                pos = tuple(pos)
-            dataset.add(pos)
+            x = random.randint(0, self.environment.width - 1)
+            y = random.randint(0, self.environment.height - 1)
+            pos = (x, y)
             attempts += 1
+            
+            # Check obstacles
+            if pos in self.environment.obstacles:
+                continue
+                
+            # Check resource proximity (5x5 area around -> distance <= 2)
+            too_close = False
+            for rp in resources_pos:
+                if abs(x - rp[0]) <= 2 and abs(y - rp[1]) <= 2:
+                    too_close = True
+                    break
+            if too_close: continue
+            
+            # Check nest proximity (2x2 area -> approx distance <= 1 for 3x3)
+            for np in nests_pos:
+                if abs(x - np[0]) <= 1 and abs(y - np[1]) <= 1:
+                    too_close = True
+                    break
+            if too_close: continue
+            
+            dataset.add(pos)
             
         dataset_list = list(dataset)
         random.shuffle(dataset_list)
         
         n_train = int(len(dataset_list) * train_ratio)
-        
         train_data = dataset_list[:n_train]
         test_data = dataset_list[n_train:]
         
-        print(f"[DATASET] Generated {len(dataset_list)} unique positions. Train: {len(train_data)} | Test: {len(test_data)}")
+        print("\n" + "="*50)
+        print("[DATASET GENERATION]")
+        print(f"Map Size: {self.environment.width}x{self.environment.height}")
+        print(f"Target positions: {n_cases}")
+        print(f"Generated positions: {len(dataset_list)}")
+        print(f"Training positions ({len(train_data)}):")
+        print(f"  {train_data}")
+        print(f"Testing positions ({len(test_data)}):")
+        print(f"  {test_data}")
+        print("="*50 + "\n")
+        
         return train_data, test_data
 
     def training_phase(self):
         saved_files = {}
         
-        # Generate dataset to ensure 70/30 split
-        training_positions, test_positions = self.generate_train_test_dataset(n_cases=100, train_ratio=0.7)
+        # Use pre-generated dataset if available
+        if not hasattr(self, "training_positions") or not self.training_positions:
+            self.training_positions, self.test_positions = self.generate_train_test_dataset()
+            
+        training_positions = self.training_positions
+        test_positions = self.test_positions
         
         # Save test dataset for future validation
         import json
         try:
             with open("test_dataset.json", "w") as f:
-                json.dump(test_positions, f)
+                # Convert tuples to lists for JSON
+                json_test_pos = [list(p) for p in test_positions]
+                json.dump(json_test_pos, f)
             print("[DATASET] Test positions saved in test_dataset.json")
         except Exception as e:
             print(f"[DATASET] Error saving test dataset: {e}")
@@ -477,20 +537,23 @@ class SimulationEngine:
         return saved_files
 
     def testing_phase(self):
-        # Try to load test dataset
-        import json
-        import os
-        test_positions = None
-        if os.path.exists("test_dataset.json"):
-            try:
-                with open("test_dataset.json", "r") as f:
-                    test_positions = json.load(f)
-                if isinstance(test_positions, list):
-                    # Convert to tuples
-                    test_positions = [tuple(p) for p in test_positions]
-                print(f"[TESTING_PHASE] Loaded {len(test_positions)} test positions.")
-            except Exception as e:
-                print(f"[TESTING_PHASE] Error reading test_dataset.json: {e}")
+        # Use pre-generated test positions if available
+        test_positions = getattr(self, "test_positions", None)
+        
+        if not test_positions:
+            # Try to load test dataset as fallback
+            import json
+            import os
+            if os.path.exists("test_dataset.json"):
+                try:
+                    with open("test_dataset.json", "r") as f:
+                        test_positions = json.load(f)
+                    if isinstance(test_positions, list):
+                        # Convert to tuples
+                        test_positions = [tuple(p) for p in test_positions]
+                    print(f"[TESTING_PHASE] Loaded {len(test_positions)} test positions from file.")
+                except Exception as e:
+                    print(f"[TESTING_PHASE] Error reading test_dataset.json: {e}")
         
         if test_positions:
             # Run simulation for each test position for each agent
@@ -591,7 +654,7 @@ class SimulationEngine:
                 all_finished = self.environment.finished(self.agents)
             else:
                 # Fallback
-                 if isinstance(self.environment, LighthouseEnvironment):
+                 if isinstance(self.environment, FarolEnvironment):
                     all_finished = all(getattr(ag, "found_target", False) for ag in self.agents)
                  elif isinstance(self.environment, ForagingEnvironment):
                     all_finished = self.environment.finished(self.agents)
@@ -669,9 +732,9 @@ class SimulationEngine:
         if obs_x:
             plt.scatter(obs_x, obs_y, color="black", marker='s', s=120, label="Obstacles")
 
-        if hasattr(self.environment, "lighthouse_pos"):
-            lighthouse_x, lighthouse_y = self.environment.lighthouse_pos
-            plt.scatter([lighthouse_x], [lighthouse_y], color="red", marker="*", s=300, label="Lighthouse")
+        if hasattr(self.environment, "farol_pos"):
+            farol_x, farol_y = self.environment.farol_pos
+            plt.scatter([farol_x], [farol_y], color="red", marker="*", s=300, label="Farol")
 
         ax = plt.gca()
         ax.set_xlim(-0.5, width - 0.5)
@@ -930,16 +993,14 @@ class SimulationEngine:
             print(f"[run_experiments] Error drawing bar plot: {e}")
 
 if __name__ == "__main__":
-    simulator = SimulationEngine().create("simulador_foraging.json")
+    simulator = SimulationEngine().create("SimuladorFarolVazio.json")
     if simulator.active:
         file_map = {
             2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
             3: "models/ForagingEnvironment_agent3_dqn_v1.pkl"
         }
         # summary = simulator.load_networks_summary(file_map=file_map, agents=[2,3])
-        # print(summary)
         # results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
-        # print("Summary:", results["summary"])
-        # simulator.training_phase()
+        simulator.training_phase()
         simulator.testing_phase()
-        # simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
+        simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)

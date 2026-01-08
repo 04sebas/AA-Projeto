@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from Agents.LearningAgent import LearningAgent
-from Environments.LighthouseEnvironment import LighthouseEnvironment
+from Environments.FarolEnvironment import FarolEnvironment
 from Objects.Action import Action
 from Learning.NeuralNetwork import create_network_architecture
 from Learning.LearningStrategy import LearningStrategy
@@ -115,7 +115,7 @@ class GeneticStrategy(LearningStrategy):
                     agent.resources_collected = 0
                     agent.resources_deposited = 0
 
-                    if isinstance(environment, LighthouseEnvironment):
+                    if isinstance(environment, FarolEnvironment):
                         if training_positions:
                             start = random.choice(training_positions)
                         else:

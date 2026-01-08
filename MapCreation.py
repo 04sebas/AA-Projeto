@@ -1,6 +1,7 @@
 import json
 
-map_config = {
+# Configuration for Foraging Environment
+map_config_foraging = {
     "simulator": {
         "max_steps": 1000,
         "visualization": True
@@ -17,7 +18,6 @@ map_config = {
             {"pos": [35, 35], "quantity": 15, "value": 25},
             {"pos": [5, 40], "quantity": 10, "value": 10},
             {"pos": [45, 45], "quantity": 5, "value": 30},
-
             {"pos": [20, 10], "quantity": 7, "value": 12},
             {"pos": [30, 15], "quantity": 9, "value": 18},
             {"pos": [15, 30], "quantity": 14, "value": 9},
@@ -58,5 +58,49 @@ map_config = {
     ]
 }
 
-with open("simulator_foraging.json", "w") as f:
-    json.dump(map_config, f, indent=4)
+# Configuration for Farol Environment
+map_config_farol = {
+    "simulator": {
+        "max_steps": 1000,
+        "visualization": True
+    },
+    "environment": {
+        "type": "FarolEnvironment",
+        "width": 50,
+        "height": 50,
+        "farol_pos": [25, 25],
+        "obstacles": [
+            [10, 10], [10, 11], [11, 10],
+            [40, 40], [40, 41], [41, 40]
+        ]
+    },
+    "agents": [
+        {
+            "type": "LearningAgent",
+            "quantity": 2,
+            "initial_position": "random",
+            "strategy_type": "genetic",
+            "sensors": 3,
+            "trainable": True,
+            "base_name": "Genetic_Farol"
+        },
+        {
+            "type": "LearningAgent",
+            "quantity": 1,
+            "initial_position": "random",
+            "strategy_type": "dqn",
+            "sensors": 3,
+            "trainable": True,
+            "base_name": "DQN_Farol"
+        }
+    ]
+}
+
+# Save configurations to JSON files
+with open("simulador_foraging.json", "w") as f:
+    json.dump(map_config_foraging, f, indent=4)
+    print("Saved simulador_foraging.json")
+
+with open("simulador_farol.json", "w") as f:
+    json.dump(map_config_farol, f, indent=4)
+    print("Saved simulador_farol.json")

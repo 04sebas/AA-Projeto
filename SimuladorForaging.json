@@ -1,116 +1,404 @@
 {
-  "simulador": {
-    "max_passos": 2000,
-    "visualizacao": true
+  "simulator": {
+    "max_steps": 2000,
+    "visualization": true
   },
-
-  "ambiente": {
-    "tipo": "AmbienteForaging",
-    "largura": 51,
-    "altura": 51,
-    "recursos": [
-      { "pos": [26, 8], "quantidade": 1, "valor": 100 },
-      { "pos": [15, 12], "quantidade": 1, "valor": 100 },
-      { "pos": [4, 16], "quantidade": 1, "valor": 100 },
-      { "pos": [19, 20], "quantidade": 1, "valor": 100 },
-      { "pos": [29, 24], "quantidade": 1, "valor": 100 },
-      { "pos": [15, 29], "quantidade": 1, "valor": 100 },
-      { "pos": [4, 33], "quantidade": 1, "valor": 100 },
-      { "pos": [11, 35], "quantidade": 1, "valor": 100 },
-      { "pos": [36, 36], "quantidade": 1, "valor": 100 },
-      { "pos": [20, 39], "quantidade": 1, "valor": 100 },
-      { "pos": [9, 41], "quantidade": 1, "valor": 100 },
-      { "pos": [23, 44], "quantidade": 1, "valor": 100 },
-      { "pos": [27, 49], "quantidade": 1, "valor": 100 }
+  "environment": {
+    "type": "ForagingEnvironment",
+    "width": 51,
+    "height": 51,
+    "resources": [
+      {
+        "pos": [
+          26,
+          8
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          15,
+          12
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          4,
+          16
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          19,
+          20
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          29,
+          24
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          15,
+          29
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          4,
+          33
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          11,
+          35
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          36,
+          36
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          20,
+          39
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          9,
+          41
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          23,
+          44
+        ],
+        "quantity": 1,
+        "value": 100
+      },
+      {
+        "pos": [
+          27,
+          49
+        ],
+        "quantity": 1,
+        "value": 100
+      }
     ],
-    "ninhos": [
-      [3, 1],
-      [22, 8],
-      [46, 12],
-      [22, 17],
-      [4, 33],
-      [37, 41],
-      [16, 45],
-      [32, 50]
+    "nests": [
+      [
+        3,
+        1
+      ],
+      [
+        22,
+        8
+      ],
+      [
+        46,
+        12
+      ],
+      [
+        22,
+        17
+      ],
+      [
+        4,
+        33
+      ],
+      [
+        37,
+        41
+      ],
+      [
+        16,
+        45
+      ],
+      [
+        32,
+        50
+      ]
     ],
-    "obstaculos": [
-      { "pos": [46, 1] },
-      { "pos": [46, 2] },
-      { "pos": [46, 3] },
-      { "pos": [24, 4] },
-      { "pos": [24, 5] },
-      { "pos": [24, 6] },
-      { "pos": [24, 7] },
-      { "pos": [24, 8] },
-      { "pos": [24, 9] },
-      { "pos": [24, 10] },
-      { "pos": [24, 11] },
-      { "pos": [24, 12] },
-      { "pos": [25, 13] },
-      { "pos": [0, 14] },
-      { "pos": [24, 14] },
-      { "pos": [0, 15] },
-      { "pos": [0, 16] },
-      { "pos": [0, 17] },
-      { "pos": [0, 18] },
-      { "pos": [1, 19] },
-      { "pos": [2, 20] },
-      { "pos": [3, 21] },
-      { "pos": [4, 22] },
-      { "pos": [5, 23] },
-      { "pos": [6, 24] },
-      { "pos": [7, 25] },
-      { "pos": [8, 26] },
-      { "pos": [9, 27] },
-      { "pos": [10, 28] },
-      { "pos": [11, 29] }
+    "obstacles": [
+      {
+        "pos": [
+          46,
+          1
+        ]
+      },
+      {
+        "pos": [
+          46,
+          2
+        ]
+      },
+      {
+        "pos": [
+          46,
+          3
+        ]
+      },
+      {
+        "pos": [
+          24,
+          4
+        ]
+      },
+      {
+        "pos": [
+          24,
+          5
+        ]
+      },
+      {
+        "pos": [
+          24,
+          6
+        ]
+      },
+      {
+        "pos": [
+          24,
+          7
+        ]
+      },
+      {
+        "pos": [
+          24,
+          8
+        ]
+      },
+      {
+        "pos": [
+          24,
+          9
+        ]
+      },
+      {
+        "pos": [
+          24,
+          10
+        ]
+      },
+      {
+        "pos": [
+          24,
+          11
+        ]
+      },
+      {
+        "pos": [
+          24,
+          12
+        ]
+      },
+      {
+        "pos": [
+          25,
+          13
+        ]
+      },
+      {
+        "pos": [
+          0,
+          14
+        ]
+      },
+      {
+        "pos": [
+          24,
+          14
+        ]
+      },
+      {
+        "pos": [
+          0,
+          15
+        ]
+      },
+      {
+        "pos": [
+          0,
+          16
+        ]
+      },
+      {
+        "pos": [
+          0,
+          17
+        ]
+      },
+      {
+        "pos": [
+          0,
+          18
+        ]
+      },
+      {
+        "pos": [
+          1,
+          19
+        ]
+      },
+      {
+        "pos": [
+          2,
+          20
+        ]
+      },
+      {
+        "pos": [
+          3,
+          21
+        ]
+      },
+      {
+        "pos": [
+          4,
+          22
+        ]
+      },
+      {
+        "pos": [
+          5,
+          23
+        ]
+      },
+      {
+        "pos": [
+          6,
+          24
+        ]
+      },
+      {
+        "pos": [
+          7,
+          25
+        ]
+      },
+      {
+        "pos": [
+          8,
+          26
+        ]
+      },
+      {
+        "pos": [
+          9,
+          27
+        ]
+      },
+      {
+        "pos": [
+          10,
+          28
+        ]
+      },
+      {
+        "pos": [
+          11,
+          29
+        ]
+      }
     ]
   },
-
-  "agentes": [
+  "agents": [
     {
-      "tipo": "AgenteFixo",
-      "quantidade": 2,
-      "posicao_inicial": [[49,49],[45,0]],
+      "type": "FixedAgent",
+      "quantity": 2,
+      "initial_position": [
+        [
+          49,
+          49
+        ],
+        [
+          45,
+          0
+        ]
+      ],
       "trainable": false,
-      "politica": {
-        "tipo": "greedy",
-        "alcance": 3
+      "policy": {
+        "type": "greedy",
+        "range": 3
       }
     },
     {
-      "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
-      "posicao_inicial": [[0,45]],
+      "type": "LearningAgent",
+      "quantity": 1,
+      "initial_position": [
+        [
+          0,
+          45
+        ]
+      ],
       "trainable": true,
-      "tipo_estrategia": "genetica",
-      "politica": {
-        "alcance": 3
+      "strategy_type": "genetic",
+      "policy": {
+        "range": 3
       },
-      "estrategia_conf": {
-        "populacao_tamanho": 100,
-        "taxa_mutacao": 0.01,
-        "num_ger": 50,
-        "tamanho_torneio": 3,
-        "elitismo_frac": 0.2,
-        "hidden": [16, 8],
-        "passos_por_avaliacao": 1500,
+      "strategy_conf": {
+        "population_size": 100,
+        "mutation_rate": 0.01,
+        "num_generations": 50,
+        "tournament_size": 3,
+        "elitism_frac": 0.2,
+        "hidden": [
+          16,
+          8
+        ],
+        "steps_per_evaluation": 1500,
         "mutation_std": 0.1
       }
     },
     {
-      "tipo": "AgenteAprendizagem",
-      "quantidade": 1,
-      "posicao_inicial": [[0,0]],
+      "type": "LearningAgent",
+      "quantity": 1,
+      "initial_position": [
+        [
+          0,
+          0
+        ]
+      ],
       "trainable": true,
-      "tipo_estrategia": "dqn",
-      "politica": {
-        "alcance": 3
+      "strategy_type": "dqn",
+      "policy": {
+        "range": 3
       },
-      "estrategia_conf": {
-        "hidden": [16, 8],
+      "strategy_conf": {
+        "hidden": [
+          16,
+          8
+        ],
         "episodes": 100,
-        "passos_por_ep": 1500,
+        "steps_per_ep": 1500,
         "gamma": 0.99,
         "epsilon": 0.7,
         "epsilon_min": 0.1,
