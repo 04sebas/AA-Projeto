@@ -11,6 +11,8 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 - `Objects/`: Objetos da Simulação (Sensores, Ações, Observações).
 - `SimulationEngine.py`: MotorDeSimulação.
 - `MapCreation.py`: Criação de Mapas.
+- `Models/`: Local dos agentes/redeneuronal treinados em .pk (Estes são automaticamente guardados nesta pasta após o treino).
+- `Results/`: Local com os resultados em .png das múltiplas simulações (.run_experiments()).
 
 ## MotorDeSimulação
 
