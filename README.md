@@ -88,6 +88,9 @@ O MotorDeSimulação utiliza ficheiros JSON para definir os Ambientes e Agentes:
 *   **`agents`**: Lista de agentes, os seus tipos (`LearningAgent`, `FixedAgent`), quantidade e definições da estratégia.
 *   **`simulator`**: Definições globais do tipo `max_steps` e `visualization`.
 
+Nota:  
+Para ser mais fácil criar múltiplos objetos pode ser utilizada a classe **`MapCreation.py`** utilizando for para adicionar esses objetos e as suas posições.
+
 **Exemplo de Ambiente:**
 ```bash
 "simulator": {
