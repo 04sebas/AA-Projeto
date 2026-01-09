@@ -58,9 +58,10 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
  **(Opcional)**
  iii) Múltiplas Simulações:  
  - Caso seja necessário testar várias simulações, com certos agentes definidos no passo ii) utiliza-se o run_experiments().  
- - Este apenas vai criar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram Recolhidos e Depositados.  
+ - Este apenas vai criar gráficos dos resultados finais, quantas vezes chegou ao Farol, ou quantos recursos foram Recolhidos e Depositados.
+ - Altere o <nome_do_grafico> para poder guardar diferentes gráficos.  
 ```bash
- results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
+ results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/<nome_do_grafico>.png")
 ```
 **(Opcional)**
  iv) Fase de treino para os agentes no <Ficheiro.json>:  
