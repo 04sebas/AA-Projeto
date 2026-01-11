@@ -109,7 +109,6 @@ class NeuralNetwork:
 
         delta_l = delta
 
-        # Iterate backwards through hidden layers
         for layer_idx in reversed(range(len(self.hidden_weights))):
             z = zs[layer_idx]
             a_prev = activations[layer_idx]

@@ -15,11 +15,8 @@ class LearningStrategy(ABC):
 
     @abstractmethod
     def train(self, environment, training_positions=None):
-        """
-        Main training method. Should populate self.fitness_history and self.path_history.
-        Returns (best_weights, best_nn).
-        """
         pass
+
 
     def generate_plots(self, environment, fitness_title="Fitness", paths_title="Paths", other_plots=None):
         if not self.verbose:
@@ -66,7 +63,6 @@ class LearningStrategy(ABC):
                     elif isinstance(o, dict) and "pos" in o:
                         obstacles_list.append(tuple(o["pos"]))
 
-            # 1. Fitness Plot
             if self.fitness_history:
                 plt.figure(figsize=(10, 4.5))
                 plt.plot(range(len(self.fitness_history)), self.fitness_history, marker='o')
@@ -76,11 +72,9 @@ class LearningStrategy(ABC):
                 plt.grid(True)
                 plt.tight_layout()
 
-            # 2. Paths Plot (Top 5)
             if self.path_history:
                 fig, ax = plt.subplots(figsize=(10, 10))
 
-                # Draw Environment
                 for (rx, ry), info in resources_list:
                     ax.add_patch(
                         patches.Circle((rx, ry), radius=0.4, facecolor="gold", alpha=0.6, edgecolor='k', linewidth=0.3))
@@ -94,13 +88,11 @@ class LearningStrategy(ABC):
                 for ox, oy in obstacles_list:
                     ax.add_patch(patches.Rectangle((ox - 0.5, oy - 0.5), 1, 1, facecolor="black"))
 
-                # Plot paths
                 total_qty = len(self.path_history)
                 top_n = min(5, total_qty)
                 
                 indices = list(range(total_qty))
                 if len(self.fitness_history) == total_qty:
-                    # assuming higher fitness is better
                     sorted_indices = sorted(indices, key=lambda i: self.fitness_history[i], reverse=True)
                     best_indices = sorted_indices[:top_n]
                 else:

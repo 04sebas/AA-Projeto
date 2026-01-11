@@ -84,8 +84,6 @@ class ForagingEnvironment(Environment):
             if load < self.capacity:
                 resource = self.resources[new_pos]
                 reward = 100.0 + resource.get("value", 25)
-                # Assuming agent has this attribute logic, if not it will be ignored on agent side if not used. 
-                # But agent classes were updated to use last_resource_value
                 agent.last_resource_value = int(resource.get("value", 1))
                 self.loads[agent] = load + 1
                 

@@ -54,7 +54,6 @@ class QLearningStrategy(LearningStrategy):
         state = np.asarray(state, dtype=np.float32)
         expected = getattr(self.policy.nn, "input_size", None)
         if expected is None:
-            # Fallback for some reason
             pass
         if state.shape[0] != expected:
             raise ValueError(f"[DQN] state size {state.shape[0]} != network input {expected}")
@@ -77,16 +76,13 @@ class QLearningStrategy(LearningStrategy):
         
         q_target = np.zeros(self.batch_size, dtype=np.float32)
 
-        # Double DQN Implementation
         for i in range(self.batch_size):
             if dones[i]:
                 q_target[i] = rewards[i]
             else:
-                # 1. Select best action using Policy Network
                 next_q_policy = self.policy.propagate(next_states[i])
                 best_action = np.argmax(next_q_policy)
                 
-                # 2. Evaluate that action using Target Network
                 next_q_target = self.target.propagate(next_states[i])
                 q_target[i] = rewards[i] + self.gamma * float(next_q_target[best_action])
 
@@ -132,7 +128,7 @@ class QLearningStrategy(LearningStrategy):
             raise RuntimeError(
                 f"[DQN] inconsistency: policy input {self.policy.nn.input_size} != expected {input_size}")
 
-        self.fitness_history = [] # rewards history
+        self.fitness_history = []
         self.path_history = []
         self.epsilon_history = [] 
 
@@ -152,7 +148,6 @@ class QLearningStrategy(LearningStrategy):
 
             agent = LearningAgent(policy={"range": sample_agent.sensors.sensing_range})
             agent.pos = start
-            # Fix: random start if needed, but keeping logic consistent
             environment.positions[agent] = tuple(agent.pos)
             agent.found_target = False
             obs = environment.observation_for(agent)
@@ -181,7 +176,6 @@ class QLearningStrategy(LearningStrategy):
                 done_flag = environment.finished([agent])
                 
                 self.memory.append((state, action_idx, float(reward), next_state, done_flag))
-                # Warmup
                 warmup = max(self.batch_size * 2, 1000)
                 if len(self.memory) >= warmup:
                     self.optimize_model()
@@ -205,13 +199,11 @@ class QLearningStrategy(LearningStrategy):
         self.best_weights = self.policy.get_weights().copy()
         self.best_nn = self.policy.nn
 
-        # Use generate_plots with callback for extra plots
         self.generate_plots(environment, fitness_title="Reward per Episode", paths_title="Trajectories — DQN", other_plots=self._extra_plots)
 
         return self.best_weights, self.best_nn
 
     def _extra_plots(self, plt):
-        # Plot Moving Average
         rewards = self.fitness_history
         if len(rewards) > 5:
             plt.figure(figsize=(10, 4.5))
@@ -225,7 +217,6 @@ class QLearningStrategy(LearningStrategy):
             plt.legend()
             plt.tight_layout()
 
-        # Plot Epsilon
         if self.epsilon_history:
             plt.figure(figsize=(8, 3))
             plt.plot(self.epsilon_history, marker='.', label='Epsilon')

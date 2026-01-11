@@ -1,6 +1,5 @@
 import json
 
-# Configuration for Foraging Environment
 map_config_foraging = {
     "simulator": {
         "max_steps": 1000,
@@ -58,7 +57,6 @@ map_config_foraging = {
     ]
 }
 
-# Configuration for Farol Environment
 map_config_farol = {
     "simulator": {
         "max_steps": 1000,
@@ -96,7 +94,6 @@ map_config_farol = {
     ]
 }
 
-# Save configurations to JSON files
 with open("simulador_foraging.json", "w") as f:
     json.dump(map_config_foraging, f, indent=4)
     print("Saved simulador_foraging.json")

@@ -75,7 +75,6 @@ class GeneticStrategy(LearningStrategy):
             dummy_agent.set_action_space(environment.get_action_names())
         num_actions = len(dummy_agent.action_names)
         available_actions = dummy_agent.action_names
-        # sensor_range is now argument
         self.nn_arch = (input_size, num_actions, self.nn_arch[2] if len(self.nn_arch) > 2 else (16, 8))
 
         self._initialize_population()
@@ -95,7 +94,6 @@ class GeneticStrategy(LearningStrategy):
             agents_per_generation = []
 
             for i, weights in enumerate(self.population):
-                # Prepare Agent with weights
                 nn = create_network_architecture(*self.nn_arch)
                 nn.load_weights(weights)
                 agent = LearningAgent(policy={"range": sensor_range}, action_names=available_actions)
@@ -107,7 +105,7 @@ class GeneticStrategy(LearningStrategy):
 
                 for trial in range(self.trials_per_evaluation):
                     environment.restart()
-                    environment.positions = {} # Ensure clean slate
+                    environment.positions = {}
 
                     agent.pos = None
                     agent.found_target = False
@@ -121,7 +119,6 @@ class GeneticStrategy(LearningStrategy):
                         else:
                             start = environment.random_position()
                     else:
-                        start = (0, 0) # Default foraging check if needed
 
                     environment.positions[agent] = tuple(start)
                     agent.pos = tuple(start)
@@ -146,9 +143,7 @@ class GeneticStrategy(LearningStrategy):
                 
                 avg_fitness = sum(trial_fitnesses) / len(trial_fitnesses)
                 
-                # Adding manual attribute path to agent just for recording
                 agent.path = last_path
-                # We update agent reward to average for consistency if inspected later
                 agent.total_reward = avg_fitness
 
                 self.fitness[i] = avg_fitness
@@ -162,7 +157,6 @@ class GeneticStrategy(LearningStrategy):
             best_fit = float(self.fitness[0])
             avg_fit = float(np.mean(self.fitness))
             
-            # Update history for plots
             self.fitness_history.append(avg_fit)
             if agents_per_generation:
                  best_agent = agents_per_generation[0]

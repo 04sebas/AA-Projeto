@@ -62,22 +62,6 @@ def _save_best_nn(environment, agent_index, weights, nn_object, nn_arch=None, ou
     print(f"[SAVED] NN (type={type_str}) saved in {path}")
     return path, meta
 
-def _to_offsets(offsets):
-    arr = np.asarray(offsets, dtype=float)
-    if arr.size == 0:
-        return np.empty((0, 2), dtype=float)
-    if arr.ndim == 1 and arr.shape[0] == 2:
-        return arr.reshape(1, 2)
-    if arr.ndim == 1 and arr.shape[0] % 2 == 0:
-        return arr.reshape(-1, 2)
-    if arr.ndim == 2 and arr.shape[1] == 2:
-        return arr
-    try:
-        return arr.reshape(-1, 2)
-    except Exception:
-        return np.empty((0, 2), dtype=float)
-
-
 class SimulationEngine:
     def __init__(self):
         self._config_file = None
@@ -111,7 +95,6 @@ class SimulationEngine:
             self.active = True
             self._config_file = param_filename
             
-            # Generate dataset for training and testing
             self.training_positions, self.test_positions = self.generate_train_test_dataset()
             
             print(f"Simulation created successfully: {len(self.agents)} agents in environment")
@@ -329,31 +312,21 @@ class SimulationEngine:
 
 
     def generate_train_test_dataset(self, n_cases=None, train_ratio=0.7):
-        """
-        Generates a set of initial positions and splits them into train and test.
-        Respects exclusion zones around resources (5x5 area) and nests (2x2 area).
-        Returns (train_list, test_list).
-        """
         import random
         if n_cases is None:
-            # Half of the map width as requested (100 -> 50, 50 -> 25)
             n_cases = self.environment.width // 2
             
         dataset = set()
         attempts = 0
         max_attempts = n_cases * 100
         
-        # Get resource positions
-        resources_pos = []
         if isinstance(self.environment.resources, dict):
             resources_pos = list(self.environment.resources.keys())
         elif isinstance(self.environment.resources, list):
             resources_pos = [tuple(r["pos"]) for r in self.environment.resources]
             
-        # Nests positions
         nests_pos = getattr(self.environment, "nests", [])
         
-        # Farol pos for FarolEnvironment (is a resource)
         if hasattr(self.environment, "farol_pos"):
             resources_pos.append(self.environment.farol_pos)
 
@@ -363,19 +336,15 @@ class SimulationEngine:
             pos = (x, y)
             attempts += 1
             
-            # Check obstacles
             if pos in self.environment.obstacles:
                 continue
                 
-            # Check resource proximity (5x5 area around -> distance <= 2)
-            too_close = False
             for rp in resources_pos:
                 if abs(x - rp[0]) <= 2 and abs(y - rp[1]) <= 2:
                     too_close = True
                     break
             if too_close: continue
             
-            # Check nest proximity (2x2 area -> approx distance <= 1 for 3x3)
             for np in nests_pos:
                 if abs(x - np[0]) <= 1 and abs(y - np[1]) <= 1:
                     too_close = True
@@ -407,18 +376,14 @@ class SimulationEngine:
     def training_phase(self):
         saved_files = {}
         
-        # Use pre-generated dataset if available
         if not hasattr(self, "training_positions") or not self.training_positions:
             self.training_positions, self.test_positions = self.generate_train_test_dataset()
             
         training_positions = self.training_positions
         test_positions = self.test_positions
         
-        # Save test dataset for future validation
-        import json
         try:
             with open("test_dataset.json", "w") as f:
-                # Convert tuples to lists for JSON
                 json_test_pos = [list(p) for p in test_positions]
                 json.dump(json_test_pos, f)
             print("[DATASET] Test positions saved in test_dataset.json")
@@ -470,7 +435,6 @@ class SimulationEngine:
                 self.environment.positions = {}
 
                 sensing_range = getattr(agent.sensors, "sensing_range", 3)
-                # Train using only training positions
                 best_weights, best_nn = ag.train(self.environment, verbose=True, input_size=input_size, training_positions=training_positions, sensor_range=sensing_range)
 
                 self.environment.restart()
@@ -510,7 +474,6 @@ class SimulationEngine:
 
                 self.environment.positions = {}
 
-                # Train using only training positions
                 best_weights, best_nn = dqn.train(self.environment, verbose=True, range_val=agent.sensors.sensing_range, training_positions=training_positions)
 
                 self.environment.restart()
@@ -537,26 +500,16 @@ class SimulationEngine:
         return saved_files
 
     def testing_phase(self):
-        # Use pre-generated test positions if available
         test_positions = getattr(self, "test_positions", None)
         
         if not test_positions:
-            # Try to load test dataset as fallback
-            import json
-            import os
-            if os.path.exists("test_dataset.json"):
-                try:
-                    with open("test_dataset.json", "r") as f:
-                        test_positions = json.load(f)
                     if isinstance(test_positions, list):
-                        # Convert to tuples
                         test_positions = [tuple(p) for p in test_positions]
                     print(f"[TESTING_PHASE] Loaded {len(test_positions)} test positions from file.")
                 except Exception as e:
                     print(f"[TESTING_PHASE] Error reading test_dataset.json: {e}")
         
         if test_positions:
-            # Run simulation for each test position for each agent
             print("[TESTING_PHASE] Starting validation on test set (30%)...")
             
             fitness_results = []
@@ -576,10 +529,8 @@ class SimulationEngine:
                     agent.resources_deposited = 0
                     self.environment.positions[agent] = tuple(pos)
                 
-                # Execute once
                 self.run(max_steps=self.max_steps)
                 
-                # Collect results
                 current_fit = 0
                 for agent in self.agents:
                     current_fit += getattr(agent, "total_reward", 0.0)
@@ -601,7 +552,6 @@ class SimulationEngine:
             plt.show()
             
         else:
-            # Fallback old
             self.run(self.max_steps)
 
     def run(self, max_steps=None):
@@ -653,7 +603,6 @@ class SimulationEngine:
             if hasattr(self.environment, "finished"):
                 all_finished = self.environment.finished(self.agents)
             else:
-                # Fallback
                  if isinstance(self.environment, FarolEnvironment):
                     all_finished = all(getattr(ag, "found_target", False) for ag in self.agents)
                  elif isinstance(self.environment, ForagingEnvironment):
@@ -681,18 +630,10 @@ class SimulationEngine:
             xs = [p[0] for p in path]
             ys = [p[1] for p in path]
             plt.plot(xs, ys, marker='.', linewidth=1, color=colors[i], label=f"{getattr(agent, 'name', f'Agent {i}')}")
-            # start / end markers
-            plt.scatter(xs[0], ys[0], c=[colors[i]], marker='o', s=80)  # start
-            plt.scatter(xs[-1], ys[-1], c=[colors[i]], marker='x', s=80)  # end
+            plt.scatter(xs[0], ys[0], c=[colors[i]], marker='o', s=80) 
+            plt.scatter(xs[-1], ys[-1], c=[colors[i]], marker='x', s=80) 
 
-        # Plot resources (supports dict or list)
-        resources = getattr(self.environment, "resources", None)
-        resources_items = []
-        if resources:
-            if isinstance(resources, dict):
-                resources_items = list(resources.items())
             else:
-                # list of objects/dicts with "pos", "quantity", "value"
                 for r in resources:
                     pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
                     if pos is not None:
@@ -995,12 +936,6 @@ class SimulationEngine:
 if __name__ == "__main__":
     simulator = SimulationEngine().create("SimuladorFarolVazio.json")
     if simulator.active:
-        file_map = {
-            2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
-            3: "models/ForagingEnvironment_agent3_dqn_v1.pkl"
-        }
-        # summary = simulator.load_networks_summary(file_map=file_map, agents=[2,3])
-        # results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
         simulator.training_phase()
         simulator.testing_phase()
         simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
