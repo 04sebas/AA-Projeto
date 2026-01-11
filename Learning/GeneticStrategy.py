@@ -113,13 +113,10 @@ class GeneticStrategy(LearningStrategy):
                     agent.resources_collected = 0
                     agent.resources_deposited = 0
 
-                    if isinstance(environment, FarolEnvironment):
-                        if training_positions:
-                            start = random.choice(training_positions)
-                        else:
-                            start = environment.random_position()
+                    if training_positions:
+                        start = random.choice(training_positions)
                     else:
-
+                        start = environment.random_position()
                     environment.positions[agent] = tuple(start)
                     agent.pos = tuple(start)
                     current_path = [agent.pos]

@@ -335,6 +335,7 @@ class SimulationEngine:
             y = random.randint(0, self.environment.height - 1)
             pos = (x, y)
             attempts += 1
+            too_close = False
             
             if pos in self.environment.obstacles:
                 continue
@@ -503,6 +504,11 @@ class SimulationEngine:
         test_positions = getattr(self, "test_positions", None)
         
         if not test_positions:
+            import os
+            if os.path.exists("test_dataset.json"):
+                try:
+                    with open("test_dataset.json", "r") as f:
+                        test_positions = json.load(f)
                     if isinstance(test_positions, list):
                         test_positions = [tuple(p) for p in test_positions]
                     print(f"[TESTING_PHASE] Loaded {len(test_positions)} test positions from file.")
@@ -633,6 +639,11 @@ class SimulationEngine:
             plt.scatter(xs[0], ys[0], c=[colors[i]], marker='o', s=80) 
             plt.scatter(xs[-1], ys[-1], c=[colors[i]], marker='x', s=80) 
 
+        resources = getattr(self.environment, "resources", None)
+        resources_items = []
+        if resources:
+            if isinstance(resources, dict):
+                resources_items = list(resources.items())
             else:
                 for r in resources:
                     pos = tuple(r.get("pos")) if isinstance(r.get("pos"), (list, tuple)) else None
@@ -934,7 +945,7 @@ class SimulationEngine:
             print(f"[run_experiments] Error drawing bar plot: {e}")
 
 if __name__ == "__main__":
-    simulator = SimulationEngine().create("SimuladorFarolVazio.json")
+    simulator = SimulationEngine().create("SimuladorForaging.json")
     if simulator.active:
         file_map = {
             2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
@@ -944,4 +955,4 @@ if __name__ == "__main__":
         # results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
         simulator.training_phase()
         simulator.testing_phase()
-        simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
+       # simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)

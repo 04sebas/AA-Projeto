@@ -380,7 +380,7 @@
     },
     {
       "type": "LearningAgent",
-      "quantity": 1,
+      "quantity": 0,
       "initial_position": [
         [
           0,
