@@ -12,6 +12,7 @@ Trabalhando em dois tipos de ambientes (Farol,Foraging).
 - `SimulationEngine.py`: MotorDeSimulação.
 - `MapCreation.py`: Criação de Mapas.
 - `Models/`: Local dos agentes/redeneuronal treinados em .pk (Estes são automaticamente guardados nesta pasta após o treino).
+- `Models/`: Local onde se encontram os GIFs (Já existem GIFs anteriormente criados para visualização da fase de testes).
 - `Results/`: Local com os resultados em .png das múltiplas simulações (.run_experiments()).
 
 ## MotorDeSimulação
