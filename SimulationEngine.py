@@ -936,6 +936,12 @@ class SimulationEngine:
 if __name__ == "__main__":
     simulator = SimulationEngine().create("SimuladorFarolVazio.json")
     if simulator.active:
+        file_map = {
+            2: "models/ForagingEnvironment_agent2_genetic_v1.pkl",
+            3: "models/ForagingEnvironment_agent3_dqn_v1.pkl"
+        }
+        # summary = simulator.load_networks_summary(file_map=file_map, agents=[2,3])
+        # results = simulator.run_experiments(num_runs=30, max_steps=750, file_map=file_map, seed=20, save_plot="results/aggregate.png")
         simulator.training_phase()
         simulator.testing_phase()
         simulator.save_animation_gif("models/trajectories_foraging.gif", fps=12, trail_len=30)
